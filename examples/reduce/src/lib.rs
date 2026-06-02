@@ -4,7 +4,7 @@ use std::{
 };
 
 use dry::MockPath;
-use ramis_core::{SelectionPolicy, sync::Canceable};
+use ramis_core::{Cancellable, SelectionPolicy};
 use ramis_schedule::StepScheduler;
 use tokio_util::sync::CancellationToken;
 
@@ -25,7 +25,7 @@ impl MockCancelToken {
     }
 }
 
-impl Canceable for MockCancelToken {
+impl Cancellable for MockCancelToken {
     fn cancel(&self) {
         self.token.cancel();
     }

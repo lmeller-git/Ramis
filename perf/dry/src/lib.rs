@@ -1,7 +1,7 @@
 use std::sync::{Arc, atomic::AtomicBool};
 
 use im::Vector;
-use ramis_core::{EventReplay, SelectionPolicy, StaticEvent, sync::Canceable};
+use ramis_core::{Cancellable, EventReplay, SelectionPolicy, StaticEvent};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct MockPath {
@@ -71,7 +71,7 @@ impl MockCancelToken {
     }
 }
 
-impl Canceable for MockCancelToken {
+impl Cancellable for MockCancelToken {
     fn cancel(&self) {
         self.is_cancelled
             .store(true, std::sync::atomic::Ordering::Release);

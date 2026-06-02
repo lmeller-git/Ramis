@@ -1,16 +1,14 @@
 #![allow(clippy::type_complexity)]
 
-use std::{
-    array, cmp,
-    collections::VecDeque,
-    hash::Hash,
-    iter::once,
-    marker::PhantomData,
-    ops::ControlFlow,
-    sync::{Arc, Mutex, Weak, atomic::AtomicU64},
+use alloc::collections::VecDeque;
+use core::{
+    array, hash::Hash, iter::once, marker::PhantomData, ops::ControlFlow, sync::atomic::AtomicU64,
 };
 
-use ramis_core::{EventReplay, ScheduledStep, SelectionPolicy, StaticEvent, sync::Canceable};
+use ramis_core::{
+    Cancellable, EventReplay, ScheduledStep, SelectionPolicy, StaticEvent,
+    sync::{Arc, Mutex, Weak, atomic::Ordering},
+};
 use smallvec::SmallVec;
 
 use crate::StepScheduler;
@@ -60,7 +58,7 @@ pub enum Advanceable {
 
 pub struct TreeNode<E, C, S, const N: usize = 2>
 where
-    C: Canceable,
+    C: Cancellable,
 {
     children: Mutex<[Option<Arc<TreeNode<E, C, S, N>>>; N]>,
     token: C,
@@ -71,7 +69,7 @@ where
 
 impl<E, C, S, const N: usize> TreeNode<E, C, S, N>
 where
-    C: Canceable,
+    C: Cancellable,
 {
     pub fn new(token: C, generation: u64) -> Self {
         Self {
@@ -101,11 +99,11 @@ where
         F: Fn(&S) -> Advanceable,
     {
         let mut may_advance = true;
-        for c in self.children.lock().unwrap().iter() {
+        for c in self.children.lock().iter() {
             match c {
                 None => may_advance = false,
-                Some(c) if c.result.lock().unwrap().is_none() => may_advance = false,
-                Some(c) if let Some(r) = c.result.lock().unwrap().as_ref() => match f(r) {
+                Some(c) if c.result.lock().is_none() => may_advance = false,
+                Some(c) if let Some(r) = c.result.lock().as_ref() => match f(r) {
                     Advanceable::May => {}
                     Advanceable::Force => return true,
                 },
@@ -119,7 +117,7 @@ where
 
 impl<E, C, S, const N: usize> Drop for TreeNode<E, C, S, N>
 where
-    C: Canceable,
+    C: Cancellable,
 {
     fn drop(&mut self) {
         self.token.cancel();
@@ -128,25 +126,25 @@ where
 
 pub struct Tree<E, C, S, const N: usize = 2>
 where
-    C: Canceable,
+    C: Cancellable,
 {
     children: Mutex<[Option<Arc<TreeNode<E, C, S, N>>>; N]>,
 }
 
 impl<E, C, S, const N: usize> Tree<E, C, S, N>
 where
-    C: Canceable,
+    C: Cancellable,
 {
     pub fn may_advcance<F>(&self, f: F) -> bool
     where
         F: Fn(&S) -> Advanceable,
     {
         let mut may_advance = true;
-        for c in self.children.lock().unwrap().iter() {
+        for c in self.children.lock().iter() {
             match c {
                 None => may_advance = false,
-                Some(c) if c.result.lock().unwrap().is_none() => may_advance = false,
-                Some(c) if let Some(r) = c.result.lock().unwrap().as_ref() => match f(r) {
+                Some(c) if c.result.lock().is_none() => may_advance = false,
+                Some(c) if let Some(r) = c.result.lock().as_ref() => match f(r) {
                     Advanceable::May => {}
                     Advanceable::Force => return true,
                 },
@@ -162,7 +160,7 @@ where
 
 pub struct BFScheduler<T, E, C, S, P, const N: usize = 2>
 where
-    C: Canceable,
+    C: Cancellable,
 {
     current_root: Mutex<T>,
     root_generation: AtomicU64,
@@ -175,7 +173,7 @@ where
 
 impl<T, E, C, S, P, const N: usize> Default for BFScheduler<T, E, C, S, P, N>
 where
-    C: Canceable,
+    C: Cancellable,
     T: Default,
 {
     fn default() -> Self {
@@ -193,16 +191,17 @@ where
 
 impl<T, E, C, S, P, const N: usize> BFScheduler<T, E, C, S, P, N>
 where
-    C: Canceable,
+    C: Cancellable,
     T: Default,
 {
     pub fn new() -> Self {
         Self::default()
     }
 }
+
 impl<T, E, C, S, P, const N: usize> BFScheduler<T, E, C, S, P, N>
 where
-    C: Canceable,
+    C: Cancellable,
     T: EventReplay<EventType = E> + Clone + Hash + Eq,
     E: StaticEvent + Clone + Hash + Eq,
     P: SelectionPolicy<S>,
@@ -218,7 +217,7 @@ where
 
 impl<T, E, C, S, P, const N: usize> StepScheduler<T, C> for BFScheduler<T, E, C, S, P, N>
 where
-    C: Canceable,
+    C: Cancellable,
     T: EventReplay<EventType = E> + Clone,
     E: StaticEvent + Clone + Eq,
     P: SelectionPolicy<S>,
@@ -228,19 +227,17 @@ where
 
     fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, C> {
         // TODO we can recheck generation every now and then and restart if it has advanced
-        let mut frontier = self.frontier.lock().unwrap();
+        let mut frontier = self.frontier.lock();
 
         // tasks (root) is empty at the beginning (and may be empty later on too)
-        let tasks = self.tasks.lock().unwrap();
+        let tasks = self.tasks.lock();
 
-        let root_guard = self.current_root.lock().unwrap();
-        let current_gen = self
-            .root_generation
-            .load(std::sync::atomic::Ordering::Acquire);
+        let root_guard = self.current_root.lock();
+        let current_gen = self.root_generation.load(Ordering::Acquire);
         let root = root_guard.clone();
         drop(root_guard);
 
-        let mut root_children = tasks.children.lock().unwrap();
+        let mut root_children = tasks.children.lock();
 
         for (variant, child) in T::EventType::VARIANTS
             .iter()
@@ -275,14 +272,13 @@ where
             if parent_node_strong
                 .result
                 .lock()
-                .unwrap()
                 .as_ref()
                 .is_some_and(P::may_reject)
             {
                 continue;
             }
 
-            let mut children = parent_node_strong.children.lock().unwrap();
+            let mut children = parent_node_strong.children.lock();
 
             for (variant, child) in T::EventType::VARIANTS
                 .iter()
@@ -293,9 +289,7 @@ where
                     continue;
                 }
 
-                let current_gen = self
-                    .root_generation
-                    .load(std::sync::atomic::Ordering::Acquire);
+                let current_gen = self.root_generation.load(Ordering::Acquire);
 
                 if parent_node_strong.generation < current_gen {
                     // should be unreachable
@@ -335,28 +329,20 @@ where
     }
 
     fn put_result(&self, path: ScheduledStep<T, Self::ItemMeta>, event: Self::StateInterpretation) {
-        let mut tasks = self.tasks.lock().unwrap();
+        let mut tasks = self.tasks.lock();
 
         let Some(node) = path.meta().upgrade() else {
             // already cancelled
             return;
         };
 
-        let current_generation = self
-            .root_generation
-            .load(std::sync::atomic::Ordering::Acquire);
+        let current_generation = self.root_generation.load(Ordering::Acquire);
 
         let item_gen = node.generation;
 
-        *node.result.lock().unwrap() = Some(event);
+        *node.result.lock() = Some(event);
 
-        if node
-            .result
-            .lock()
-            .unwrap()
-            .as_ref()
-            .is_some_and(P::may_reject)
-        {
+        if node.result.lock().as_ref().is_some_and(P::may_reject) {
             // reap all children
             // Note that it is possible for a child to be correct. Since we do not search for global optimum, this does not matter. Any path to q-minimality is fine.
 
@@ -364,11 +350,7 @@ where
             // a) not a subtree of us
 
             // then drop all of our children. This will invalidate Weak references in frontier and tasks and ensure no further exploration. This is simply here because we may not be the last of our siblings to be done. in this case we can already remove our subtree
-            node.children
-                .lock()
-                .unwrap()
-                .iter_mut()
-                .for_each(|c| *c = None);
+            node.children.lock().iter_mut().for_each(|c| *c = None);
         }
 
         // reap all non-children and set as root if our generation == current_generation
@@ -391,7 +373,7 @@ where
                     let mut best = None;
                     for (variant, child) in E::VARIANTS.iter().zip(children.iter()) {
                         let Some(child) = child else { continue; };
-                        let res_lock = child.result.lock().unwrap();
+                        let res_lock = child.result.lock();
                         let Some(res) = res_lock.as_ref() else { continue; };
 
                         if P::may_reject(res) {
@@ -403,7 +385,7 @@ where
                         }
 
                         if best.as_ref().is_none_or(|(_, best): &(E, Arc<TreeNode<E, C, S, N>>)| {
-                            P::compare(best.result.lock().unwrap().as_ref().unwrap(), res) == cmp::Ordering::Less
+                            P::compare(best.result.lock().as_ref().unwrap(), res) ==  core::cmp::Ordering::Less
                         }) {
                             best = Some((variant.clone(), child.clone()));
                         }
@@ -411,12 +393,11 @@ where
                     best
                 };
 
-            let Some((variant, mut lowest_node)) = find_best(&tasks.children.lock().unwrap())
-            else {
+            let Some((variant, mut lowest_node)) = find_best(&tasks.children.lock()) else {
                 return;
             };
 
-            let mut acc = vec![variant];
+            let mut acc = alloc::vec![variant];
 
             TreeNode::walk_subtree(lowest_node.clone(), &mut |node| {
                 if !node.may_advcance(|r| {
@@ -428,7 +409,7 @@ where
                 }) {
                     return ControlFlow::Break(());
                 }
-                if let Some((variant, next_node)) = find_best(&node.children.lock().unwrap()) {
+                if let Some((variant, next_node)) = find_best(&node.children.lock()) {
                     acc.push(variant);
                     lowest_node = next_node.clone();
                     ControlFlow::Continue(next_node)
@@ -437,14 +418,14 @@ where
                 }
             });
 
-            let mut root = self.current_root.lock().unwrap();
+            let mut root = self.current_root.lock();
             if self
                 .root_generation
                 .compare_exchange(
                     current_generation,
                     lowest_node.generation,
-                    std::sync::atomic::Ordering::AcqRel,
-                    std::sync::atomic::Ordering::Acquire,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
                 )
                 .is_err()
             {
@@ -456,21 +437,18 @@ where
             root.extend_with_slice(&acc);
 
             *tasks = Tree {
-                children: Mutex::new(lowest_node.children.lock().unwrap().clone()),
+                children: Mutex::new(lowest_node.children.lock().clone()),
             };
         }
     }
 
     fn notify_done(&self) {
-        self.root_generation
-            .store(u64::MAX, std::sync::atomic::Ordering::Release);
-        self.frontier.lock().unwrap().clear();
+        self.root_generation.store(u64::MAX, Ordering::Release);
+        self.frontier.lock().clear();
         self.tasks
             .lock()
-            .unwrap()
             .children
-            .get_mut()
-            .unwrap()
+            .lock()
             .iter_mut()
             .for_each(|ele| *ele = None);
     }

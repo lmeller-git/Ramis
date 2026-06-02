@@ -1,12 +1,12 @@
 use std::sync::Weak;
 
 use pyo3::prelude::*;
-use ramis_core::{EventReplay, ScheduledStep, SelectionPolicy, StaticEvent, sync::Canceable};
+use ramis_core::{Cancellable, EventReplay, ScheduledStep, SelectionPolicy, StaticEvent};
 use ramis_schedule::{BFScheduler as RawBFScheduler, StepScheduler, TreeNode};
 
 pub struct PyCancelToken(Py<PyAny>);
 
-impl Canceable for PyCancelToken {
+impl Cancellable for PyCancelToken {
     fn cancel(&self) {
         Python::attach(|py| _ = self.0.bind(py).call_method0("set"));
     }

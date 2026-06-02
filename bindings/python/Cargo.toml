@@ -17,5 +17,5 @@ extension-module = ["pyo3/extension-module"]
 
 [dependencies]
 pyo3 = { version = "0.28.2" }
-ramis-core = { workspace = true }
-ramis-schedule = { workspace = true }
+ramis-core = { workspace = true, features = ["std"] }
+ramis-schedule = { workspace = true, features = ["std"] }

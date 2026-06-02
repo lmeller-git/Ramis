@@ -1,15 +1,17 @@
 [package]
-name = "ramis-schedule"
+name = "ramis"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+
 [features]
 default = ["std"]
-std = ["ramis-core/std"]
+std = ["ramis-core/std", "ramis-schedule/std"]
 
 [dependencies]
 ramis-core = { path = "../ramis-core", default-features = false }
-smallvec = "1.15.1"
+ramis-schedule = { path = "../ramis-schedule", default-features = false }
+

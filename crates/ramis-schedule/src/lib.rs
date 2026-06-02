@@ -1,3 +1,10 @@
+#![no_std]
+
+#[cfg(feature = "std")]
+extern crate std;
+
+extern crate alloc;
+
 mod adaptive;
 mod breadth_first;
 mod depth_first;

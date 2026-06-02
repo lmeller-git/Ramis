@@ -17,3 +17,8 @@ impl<T, M> ScheduledStep<T, M> {
         &self.recording
     }
 }
+
+pub trait Cancellable {
+    fn cancel(&self);
+    fn is_cancelled(&self) -> bool;
+}
