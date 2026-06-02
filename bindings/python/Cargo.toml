@@ -1,0 +1,21 @@
+[package]
+name = "lib-ramis"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+
+[lib]
+name = "lib_ramis"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+pyo3 = { version = "0.28.2" }
+ramis-core = { workspace = true }
+ramis-schedule = { workspace = true }

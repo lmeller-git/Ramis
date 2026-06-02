@@ -1,0 +1,25 @@
+[package]
+name = "dry"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+dhat-heap = ["dhat"]
+
+[dependencies]
+ramis-core = { workspace = true }
+ramis-schedule = { workspace = true }
+im = "15.1.0"
+
+dhat = { version = "0.3.3", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.8.1", features = ["html_reports"] }
+
+[[bench]]
+name = "throughput"
+harness = false

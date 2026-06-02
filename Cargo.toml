@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/*",
+  "perf/dry",
+  "examples/reduce",
+  "bindings/python"
+]
+
+default-members = [
+  "crates/*"
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = []
+edition = "2024"
+license = ""
+repository = ""
+
+[workspace.dependencies]
+ramis-core = { path = "./crates/ramis-core" }
+ramis-schedule = { path = "./crates/ramis-schedule" }
+
