@@ -127,11 +127,15 @@ where
             match c {
                 None => may_advance = false,
                 Some(c) if c.result.lock().is_none() => may_advance = false,
-                Some(c) if let Some(r) = c.result.lock().as_ref() => match f(r) {
-                    Advanceable::May => {}
-                    Advanceable::Force => return true,
-                },
-                _ => unreachable!(),
+                Some(c) => {
+                    let r = c.result.lock();
+                    if let Some(r) = r.as_ref() {
+                        match f(r) {
+                            Advanceable::May => {}
+                            Advanceable::Force => return true,
+                        }
+                    }
+                }
             }
         }
 
@@ -174,11 +178,15 @@ where
             match c {
                 None => may_advance = false,
                 Some(c) if c.result.lock().is_none() => may_advance = false,
-                Some(c) if let Some(r) = c.result.lock().as_ref() => match f(r) {
-                    Advanceable::May => {}
-                    Advanceable::Force => return true,
-                },
-                _ => unreachable!(),
+                Some(c) => {
+                    let r = c.result.lock();
+                    if let Some(r) = r.as_ref() {
+                        match f(r) {
+                            Advanceable::May => {}
+                            Advanceable::Force => return true,
+                        }
+                    }
+                }
             }
         }
 
