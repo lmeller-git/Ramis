@@ -2,11 +2,20 @@
 
 use alloc::collections::VecDeque;
 use core::{
-    array, hash::Hash, iter::once, marker::PhantomData, ops::ControlFlow, sync::atomic::AtomicU64,
+    array,
+    hash::Hash,
+    iter::once,
+    marker::PhantomData,
+    ops::ControlFlow,
+    sync::atomic::AtomicU64,
 };
 
 use ramis_core::{
-    Cancellable, EventReplay, ScheduledStep, SelectionPolicy, StaticEvent,
+    Cancellable,
+    EventReplay,
+    ScheduledStep,
+    SelectionPolicy,
+    StaticEvent,
     sync::{Arc, Mutex, Weak, atomic::Ordering},
 };
 use smallvec::SmallVec;
@@ -222,8 +231,8 @@ where
     E: StaticEvent + Clone + Eq,
     P: SelectionPolicy<S>,
 {
-    type StateInterpretation = S;
     type ItemMeta = Weak<TreeNode<E, C, S, N>>;
+    type StateInterpretation = S;
 
     fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, C> {
         // TODO we can recheck generation every now and then and restart if it has advanced

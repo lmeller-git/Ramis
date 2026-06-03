@@ -11,8 +11,7 @@ pub use shuttle_::*;
 mod shuttle_ {
     #[allow(unused_imports)]
     pub use shuttle::hint;
-    pub use shuttle::sync::atomic;
-    pub use shuttle::thread;
+    pub use shuttle::{sync::atomic, thread};
 
     pub mod cell {
         #[derive(Debug)]
@@ -43,11 +42,12 @@ mod shuttle_ {
 
 #[cfg(all(loom, test))]
 mod loom_ {
-    pub use loom::cell;
-    pub use loom::hint;
-    pub use loom::sync::Arc;
-    pub use loom::sync::atomic;
-    pub use loom::thread;
+    pub use loom::{
+        cell,
+        hint,
+        sync::{Arc, atomic},
+        thread,
+    };
 }
 
 #[cfg(any(not(test), all(not(loom), not(shuttle))))]
@@ -77,23 +77,21 @@ mod core_ {
             }
         }
     }
+    pub use alloc::sync::*;
     #[cfg(not(feature = "std"))]
     pub use core::hint;
-    pub use portable_atomic as atomic;
-
     #[cfg(feature = "std")]
     pub use std::hint;
     #[cfg(feature = "std")]
     pub use std::thread;
 
-    pub use alloc::sync::*;
+    pub use portable_atomic as atomic;
 }
-
-#[cfg(all(not(loom), not(feature = "std")))]
-pub use spin::{Mutex, MutexGuard};
 
 #[cfg(all(not(loom), feature = "std"))]
 pub use mutex::*;
+#[cfg(all(not(loom), not(feature = "std")))]
+pub use spin::{Mutex, MutexGuard};
 
 #[cfg(all(not(loom), feature = "std"))]
 mod mutex {
@@ -107,6 +105,7 @@ mod mutex {
         pub const fn new(t: T) -> Self {
             Self(std::sync::Mutex::new(t))
         }
+
         pub fn lock(&self) -> MutexGuard<'_, T> {
             self.0.lock().unwrap()
         }
@@ -119,8 +118,8 @@ pub(crate) use mutex::*;
 #[cfg(loom)]
 mod mutex {
     use core::ops::{Deref, DerefMut};
-    pub use loom::sync::Arc;
-    pub use loom::sync::MutexGuard;
+
+    pub use loom::sync::{Arc, MutexGuard};
 
     #[derive(Debug, Default)]
     pub struct Mutex<T>(loom::sync::Mutex<T>);
@@ -130,6 +129,7 @@ mod mutex {
         pub const fn new(t: T) -> Self {
             Self(loom::sync::Mutex::new(t))
         }
+
         pub fn lock(&self) -> MutexGuard<'_, T> {
             self.0.lock().unwrap()
         }

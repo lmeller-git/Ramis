@@ -1,8 +1,12 @@
-use std::hint::black_box;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
-use std::time::Instant;
+use std::{
+    hint::black_box,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    thread,
+    time::Instant,
+};
 
 use dry::{BooleanAcceptor, MockCancelToken, MockInterpretation, MockPath};
 use ramis_schedule::{BFScheduler, StepScheduler};

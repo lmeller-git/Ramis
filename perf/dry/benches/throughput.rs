@@ -1,9 +1,8 @@
+use std::{hint::black_box, sync::Arc, thread};
+
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use dry::{BooleanAcceptor, MockCancelToken, MockEvent, MockInterpretation, MockPath};
 use ramis_schedule::{BFScheduler, StepScheduler};
-use std::hint::black_box;
-use std::sync::Arc;
-use std::thread;
 
 // benchmarks llm generated
 

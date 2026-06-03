@@ -1,7 +1,6 @@
-use ramis_schedule::BFScheduler;
-use std::sync::Arc;
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 
+use ramis_schedule::BFScheduler;
 use reduce::*;
 
 #[tokio::main]
