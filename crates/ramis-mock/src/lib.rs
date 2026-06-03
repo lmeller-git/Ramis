@@ -1,7 +1,6 @@
-#![no_std]
+#![cfg_attr(not(any(feature = "std", test)), no_std)]
 
-use ramis_core::Cancellable;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", test))]
 extern crate std;
 
 extern crate alloc;
@@ -12,6 +11,8 @@ pub mod path;
 
 #[cfg(any(test, feature = "std"))]
 pub mod test_impls;
+
+use ramis_core::Cancellable;
 
 #[derive(Debug, Clone, Default)]
 pub struct MockCancel {

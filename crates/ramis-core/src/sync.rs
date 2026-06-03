@@ -1,3 +1,5 @@
+//! crate internal sync plumbing for testing and no_std support
+
 #![allow(dead_code, unused_imports)]
 
 #[cfg(any(not(test), all(not(loom), not(shuttle))))]
@@ -53,19 +55,24 @@ mod loom_ {
 #[cfg(any(not(test), all(not(loom), not(shuttle))))]
 mod core_ {
     pub mod cell {
+        //! UnsafeCell
         #[derive(Debug)]
+        /// wraps core::cell::UnsafeCell
         pub struct UnsafeCell<T>(core::cell::UnsafeCell<T>);
 
         #[allow(dead_code)]
         impl<T> UnsafeCell<T> {
+            /// creates a new UnsafeCell
             pub fn new(data: T) -> UnsafeCell<T> {
                 UnsafeCell(core::cell::UnsafeCell::new(data))
             }
 
+            /// allows immutable acces to the stored value
             pub fn with<R>(&self, f: impl FnOnce(*const T) -> R) -> R {
                 f(self.0.get())
             }
 
+            /// allows mutable access to the stored value
             pub fn with_mut<R>(&self, f: impl FnOnce(*mut T) -> R) -> R {
                 f(self.0.get())
             }
@@ -98,14 +105,17 @@ mod mutex {
     pub use std::sync::MutexGuard;
 
     #[derive(Debug, Default)]
+    /// wraps std::sync::Mutex
     pub struct Mutex<T>(std::sync::Mutex<T>);
 
     impl<T> Mutex<T> {
         #[allow(dead_code)]
+        /// Constructs a new Mutex
         pub const fn new(t: T) -> Self {
             Self(std::sync::Mutex::new(t))
         }
 
+        /// locks the Mutex. This calls unwrap() on the internal Mutex, panicking on poison.
         pub fn lock(&self) -> MutexGuard<'_, T> {
             self.0.lock().unwrap()
         }

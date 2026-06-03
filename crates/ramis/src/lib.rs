@@ -1,9 +1,14 @@
-#![no_std]
+#![doc = include_str!("../../../README.md")]
+#![deny(missing_docs)]
+#![deny(clippy::missing_safety_doc, clippy::undocumented_unsafe_blocks)]
+#![warn(unsafe_op_in_unsafe_fn)]
+#![cfg_attr(not(any(feature = "std", test)), no_std)]
 
 #[cfg(feature = "std")]
 extern crate std;
 
 pub mod traits {
+    //! Module containing core traits used to describe an Algorithm to a scheduler.
     pub use ramis_core::{
         Algorithm,
         Cancellable,
@@ -17,6 +22,7 @@ pub mod traits {
 }
 
 pub mod schedule {
+    //! Module containing schedulers. All schedulers in this module are more convenient newtypes or reexports from `ramis::core::schedule`.
     use ramis_core::{Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
     use ramis_schedule::{BFScheduler, StepScheduler};
 
@@ -30,6 +36,7 @@ pub mod schedule {
         D::Algorithm,
     >;
 
+    /// A Concurrent Breath First Search Scheduler
     pub struct BFS<D: SearchDomain, C: Cancellable> {
         inner: RawBFS<D, C>,
     }
@@ -50,6 +57,7 @@ pub mod schedule {
     where
         C: Cancellable,
     {
+        /// Constructs a new `BFS` scheduler with initial state `state`.
         pub fn new(state: D::State) -> Self {
             Self {
                 inner: BFScheduler::new(state),
@@ -90,7 +98,9 @@ pub mod schedule {
 }
 
 pub mod core {
+    //! Module containing public core types and functionality of the `Ramis` crate.
     pub mod schedule {
+        //! Module containing public core scheduler types and functionality of the `Ramis` crate. Prefer using reexports in `ramis::schedule` instead.
         pub use ramis_schedule::BFScheduler;
     }
 }

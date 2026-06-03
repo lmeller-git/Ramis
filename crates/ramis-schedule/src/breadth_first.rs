@@ -23,6 +23,7 @@ use smallvec::SmallVec;
 
 use crate::StepScheduler;
 
+/// A trace of events relative to some state at generation N
 #[derive(Hash, Clone, Default, Debug, PartialEq, Eq)]
 pub struct RelativePath<E> {
     generation: u64,
@@ -30,6 +31,7 @@ pub struct RelativePath<E> {
 }
 
 impl<E> RelativePath<E> {
+    /// constructs an empty relative path to generation N
     pub fn new(generation: u64) -> Self {
         Self {
             generation,
@@ -37,6 +39,7 @@ impl<E> RelativePath<E> {
         }
     }
 
+    /// constructs a non-empty relkative path to generation N
     pub fn new_from(generation: u64, path: impl Iterator<Item = E>) -> Self {
         Self {
             generation,
@@ -61,11 +64,15 @@ impl<E: StaticEvent + Clone + Eq> EventReplay for RelativePath<E> {
     }
 }
 
+/// Can a branch advance, or must we wait on it
 pub enum Advanceable {
+    /// The node associated with this branch can adavance irrespecitve of all other branches
     Force,
+    /// The ndoe can advance if all other branches in this node can also advance
     May,
 }
 
+/// A node in the schedulers tree representation of the algorithm
 pub struct TreeNode<E, C, S>
 where
     C: Cancellable,
@@ -84,6 +91,7 @@ where
     C: Cancellable,
     E: HasLevelStorage,
 {
+    /// constructs a new Node in generation N with CancellaitoToken C
     pub fn new(token: C, generation: u64, parent: Option<Weak<Self>>) -> Self {
         Self {
             children: Mutex::new(E::storage_from_fn(|_| None)),
@@ -95,6 +103,7 @@ where
         }
     }
 
+    /// Walks the entire subtree starting at self, until f stops yielding children
     pub fn walk_subtree<F, R>(zelf: Arc<Self>, f: &mut F) -> R
     where
         F: FnMut(Arc<Self>) -> ControlFlow<R, Arc<Self>>,
@@ -108,6 +117,7 @@ where
         }
     }
 
+    /// can this node advance into one of it sbranches?
     pub fn may_advcance<F>(&self, f: F) -> bool
     where
         F: Fn(&S) -> Advanceable,
@@ -139,6 +149,8 @@ where
     }
 }
 
+/// the tree representation of the algorithm in the scheduler.
+/// This is the root of the tree.
 pub struct Tree<E, C, S>
 where
     C: Cancellable,
@@ -152,6 +164,7 @@ where
     C: Cancellable,
     E: HasLevelStorage,
 {
+    /// can the root advance into on eof its children?
     pub fn may_advcance<F>(&self, f: F) -> bool
     where
         F: Fn(&S) -> Advanceable,
@@ -175,6 +188,9 @@ where
 
 // TODO improve locking scheme in layout and usage
 
+/// A breath first search scheduler for an algorithm T, E, S, P, A.
+/// Guarantees to find a 1-minimal solution.
+/// Maximizes worker utilization by preemptively scheduling predivtive paths in a breadth first manner.
 pub struct BFScheduler<T, E, C, S, P, A>
 where
     C: Cancellable,
@@ -205,6 +221,7 @@ where
     C: Cancellable,
     E: HasLevelStorage,
 {
+    /// Constructs a new BFScheduler with the given initial State.
     pub fn new(state: T) -> Self {
         Self {
             current_root: Mutex::new(state),
