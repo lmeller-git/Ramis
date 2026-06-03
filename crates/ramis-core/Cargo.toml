@@ -9,8 +9,6 @@ repository.workspace = true
 [features]
 default = ["std"]
 std = []
-shuttle = []
-loom = []
 
 [dependencies]
 portable-atomic = { version = "1.11.1" }

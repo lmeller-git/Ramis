@@ -1,3 +1,5 @@
+use core::hint::black_box;
+
 use ramis_core::StaticEvent;
 use ramis_schedule::StepScheduler;
 
@@ -99,4 +101,106 @@ where
         scheduler.next(token).is_err(),
         "Scheduler allowed tasks to be drawn after notify_done() was issued!"
     );
+}
+
+pub fn mpmc_concurrent<S, E>(workers: usize)
+where
+    E: StaticEvent + Clone,
+    S: Default
+        + StepScheduler<SimplePath<E>, MockCancel, StateInterpretation = MockOracleEvent>
+        + Sync,
+{
+    let scheduler = S::default();
+    #[cfg(any(shuttle, loom))]
+    const COUNT: usize = 2000;
+    #[cfg(not(any(shuttle, loom)))]
+    const COUNT: usize = 20_000;
+
+    let current_count = ramis_core::sync::atomic::AtomicUsize::new(COUNT);
+
+    ramis_core::sync::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                loop {
+                    let token = MockCancel::default();
+                    let Ok(item) = scheduler.next(token) else {
+                        break;
+                    };
+                    let old = current_count
+                        .fetch_update(
+                            core::sync::atomic::Ordering::Release,
+                            core::sync::atomic::Ordering::Acquire,
+                            |num| Some(num.saturating_sub(1)),
+                        )
+                        .unwrap();
+
+                    black_box(&item);
+
+                    scheduler.put_result(item, MockOracleEvent::Alive(42));
+
+                    if old <= 1 {
+                        break;
+                    }
+                }
+            });
+        }
+    });
+
+    assert!(current_count.load(ramis_core::sync::atomic::Ordering::Acquire) == 0);
+}
+
+pub fn mpmc_concurrent_pruned<S, E>(workers: usize)
+where
+    E: StaticEvent + Clone,
+    S: Default
+        + StepScheduler<SimplePath<E>, MockCancel, StateInterpretation = MockOracleEvent>
+        + Sync,
+{
+    let scheduler = S::default();
+    #[cfg(any(shuttle, loom))]
+    const COUNT: usize = 2000;
+    #[cfg(not(any(shuttle, loom)))]
+    const COUNT: usize = 20_000;
+
+    let current_count = ramis_core::sync::atomic::AtomicUsize::new(COUNT);
+    let kill_this_counter = ramis_core::sync::atomic::AtomicBool::new(false);
+
+    ramis_core::sync::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                loop {
+                    let token = MockCancel::default();
+                    let Ok(item) = scheduler.next(token) else {
+                        break;
+                    };
+                    let old = current_count
+                        .fetch_update(
+                            core::sync::atomic::Ordering::Release,
+                            core::sync::atomic::Ordering::Acquire,
+                            |num| Some(num.saturating_sub(1)),
+                        )
+                        .unwrap();
+
+                    black_box(&item);
+
+                    let kill_this =
+                        kill_this_counter.fetch_not(core::sync::atomic::Ordering::AcqRel);
+
+                    let res = if kill_this {
+                        MockOracleEvent::Dead
+                    } else {
+                        MockOracleEvent::Alive(42)
+                    };
+
+                    scheduler.put_result(item, res);
+
+                    if old <= 1 {
+                        break;
+                    }
+                }
+            });
+        }
+    });
+
+    assert!(current_count.load(ramis_core::sync::atomic::Ordering::Acquire) == 0);
 }

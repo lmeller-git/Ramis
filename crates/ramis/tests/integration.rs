@@ -12,6 +12,8 @@ use ramis_mock::{
         assert_infinite_without_feedback,
         assert_notify_done_terminates_immediately,
         assert_token_cancellation_propagation,
+        mpmc_concurrent,
+        mpmc_concurrent_pruned,
     },
 };
 
@@ -44,4 +46,30 @@ fn test_cancel_bfs() {
 #[test]
 fn test_kill_bfs() {
     assert_notify_done_terminates_immediately::<BFS<SimplDomain<Flat>>, Flat>();
+}
+
+#[test]
+fn test_get_put_sequential_bfs() {
+    mpmc_concurrent::<BFS<SimplDomain<Triplet>>, Triplet>(1);
+}
+
+#[test]
+fn test_get_put_concurrent_bfs() {
+    #[cfg(not(any(shuttle, loom)))]
+    mpmc_concurrent::<BFS<SimplDomain<Triplet>>, Triplet>(16);
+    #[cfg(any(shuttle, loom))]
+    mpmc_concurrent::<BFS<SimplDomain<Triplet>>, Triplet>(8);
+}
+
+#[test]
+fn test_get_put_prune_sequential_bfs() {
+    mpmc_concurrent_pruned::<BFS<SimplDomain<Triplet>>, Triplet>(1);
+}
+
+#[test]
+fn test_get_put_prune_concurrent_bfs() {
+    #[cfg(not(any(shuttle, loom)))]
+    mpmc_concurrent_pruned::<BFS<SimplDomain<Triplet>>, Triplet>(16);
+    #[cfg(any(shuttle, loom))]
+    mpmc_concurrent_pruned::<BFS<SimplDomain<Triplet>>, Triplet>(8);
 }

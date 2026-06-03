@@ -19,21 +19,22 @@ pub mod schedule {
     use ramis_core::{EventReplay, SearchDomain, SelectionPolicy, StaticEvent};
     use ramis_schedule::{BFScheduler, StepScheduler};
 
+    #[allow(type_alias_bounds)]
+    type RawBFS<D: SearchDomain> = BFScheduler<
+        D::Path,
+        <D::Path as EventReplay>::EventType,
+        D::Cancel,
+        <D::Policy as SelectionPolicy>::OracleEvent,
+        D::Policy,
+    >;
+
     pub struct BFS<D: SearchDomain> {
-        #[allow(clippy::type_complexity)]
-        inner: BFScheduler<
-            D::Path,
-            <D::Path as EventReplay>::EventType,
-            D::Cancel,
-            <D::Policy as SelectionPolicy>::OracleEvent,
-            D::Policy,
-        >,
+        inner: RawBFS<D>,
     }
 
     impl<D: SearchDomain> Default for BFS<D>
     where
-        <D::Path as EventReplay>::EventType: Eq + Clone + StaticEvent,
-        D::Path: Clone + Default,
+        D::Path: Default,
     {
         fn default() -> Self {
             Self::new()
@@ -42,8 +43,7 @@ pub mod schedule {
 
     impl<D: SearchDomain> BFS<D>
     where
-        <D::Path as EventReplay>::EventType: Eq + Clone + StaticEvent,
-        D::Path: Clone + Default,
+        D::Path: Default,
     {
         pub fn new() -> Self {
             Self {
@@ -54,16 +54,10 @@ pub mod schedule {
 
     impl<D: SearchDomain> StepScheduler<D::Path, D::Cancel> for BFS<D>
     where
-        <D::Path as EventReplay>::EventType: Eq + Clone + StaticEvent,
+        <D::Path as EventReplay>::EventType: Clone + StaticEvent,
         D::Path: Clone,
     {
-        type ItemMeta = <BFScheduler<
-            D::Path,
-            <D::Path as EventReplay>::EventType,
-            D::Cancel,
-            <D::Policy as SelectionPolicy>::OracleEvent,
-            D::Policy,
-        > as StepScheduler<D::Path, D::Cancel>>::ItemMeta;
+        type ItemMeta = <RawBFS<D> as StepScheduler<D::Path, D::Cancel>>::ItemMeta;
         type StateInterpretation = <D::Policy as SelectionPolicy>::OracleEvent;
 
         fn next(

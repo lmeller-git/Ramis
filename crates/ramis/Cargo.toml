@@ -17,3 +17,13 @@ ramis-schedule = { path = "../ramis-schedule", default-features = false }
 
 [dev-dependencies]
 ramis-mock = { workspace = true }
+
+[target.'cfg(loom)'.dependencies]
+loom = "0.7.2"
+
+[target.'cfg(shuttle)'.dependencies]
+shuttle = "0.9.1"
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(loom)', 'cfg(shuttle)'] }
+
