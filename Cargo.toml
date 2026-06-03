@@ -21,5 +21,6 @@ repository = ""
 [workspace.dependencies]
 ramis-core = { path = "./crates/ramis-core" }
 ramis-schedule = { path = "./crates/ramis-schedule" }
+ramis-mock = { path = "crates/ramis-mock" }
 ramis = { path = "crates/ramis" }
 lock_api = "0.4.14"

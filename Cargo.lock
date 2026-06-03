@@ -864,6 +864,7 @@ name = "ramis"
 version = "0.1.0"
 dependencies = [
  "ramis-core",
+ "ramis-mock",
  "ramis-schedule",
 ]
 
@@ -876,6 +877,14 @@ dependencies = [
  "portable-atomic",
  "shuttle",
  "spin",
+]
+
+[[package]]
+name = "ramis-mock"
+version = "0.1.0"
+dependencies = [
+ "ramis-core",
+ "ramis-schedule",
 ]
 
 [[package]]

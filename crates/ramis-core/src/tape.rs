@@ -18,7 +18,7 @@ pub trait HasLevelStorage {
         F: FnMut(usize) -> T;
 }
 
-pub trait StaticEvent: HasLevelStorage + Sized + 'static {
+pub trait StaticEvent: HasLevelStorage + Sized + 'static + Eq {
     const VARIANTS: &Self::LevelStorage<Self>;
 }
 
@@ -45,4 +45,36 @@ pub trait SelectionPolicy {
     fn compare(a: &Self::OracleEvent, b: &Self::OracleEvent) -> Ordering;
     fn may_reject(s: &Self::OracleEvent) -> bool;
     fn may_accept(s: &Self::OracleEvent) -> bool;
+}
+
+#[macro_export]
+macro_rules! generate_static_event {
+    (
+        $vis:vis enum $name:ident {
+            $($variant:ident),+ $(,)?
+        }
+    ) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        $vis enum $name {
+            $($variant),+
+        }
+
+        impl HasLevelStorage for $name {
+            type LevelStorage<T> = [T; [ $( stringify!($variant) ),+ ].len() ];
+
+            #[inline]
+            fn storage_from_fn<T, F>(f: F) -> Self::LevelStorage<T>
+            where
+                F: FnMut(usize) -> T,
+            {
+                core::array::from_fn(f)
+            }
+        }
+
+        impl StaticEvent for $name {
+            const VARIANTS: &Self::LevelStorage<Self> = &[
+                $( Self::$variant ),+
+            ];
+        }
+    };
 }

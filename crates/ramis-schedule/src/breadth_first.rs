@@ -235,6 +235,10 @@ where
 
         let root_guard = self.current_root.lock();
         let current_gen = self.root_generation.load(Ordering::Acquire);
+        if current_gen == u64::MAX {
+            return Err(token);
+        }
+
         let root = root_guard.clone();
         drop(root_guard);
 

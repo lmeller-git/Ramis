@@ -1,11 +1,11 @@
 [package]
-name = "ramis"
+name = "ramis-mock"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-
+publish = false
 
 [features]
 default = ["std"]
@@ -14,6 +14,3 @@ std = ["ramis-core/std", "ramis-schedule/std"]
 [dependencies]
 ramis-core = { path = "../ramis-core", default-features = false }
 ramis-schedule = { path = "../ramis-schedule", default-features = false }
-
-[dev-dependencies]
-ramis-mock = { workspace = true }
