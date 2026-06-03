@@ -2,7 +2,6 @@
 
 use alloc::collections::VecDeque;
 use core::{
-    array,
     hash::Hash,
     iter::once,
     marker::PhantomData,
@@ -13,6 +12,7 @@ use core::{
 use ramis_core::{
     Cancellable,
     EventReplay,
+    HasLevelStorage,
     ScheduledStep,
     SelectionPolicy,
     StaticEvent,
@@ -65,24 +65,26 @@ pub enum Advanceable {
     May,
 }
 
-pub struct TreeNode<E, C, S, const N: usize = 2>
+pub struct TreeNode<E, C, S>
 where
     C: Cancellable,
+    E: HasLevelStorage,
 {
-    children: Mutex<[Option<Arc<TreeNode<E, C, S, N>>>; N]>,
+    children: Mutex<E::LevelStorage<Option<Arc<TreeNode<E, C, S>>>>>,
     token: C,
     generation: u64,
     result: Mutex<Option<S>>,
     _phantom: PhantomData<E>,
 }
 
-impl<E, C, S, const N: usize> TreeNode<E, C, S, N>
+impl<E, C, S> TreeNode<E, C, S>
 where
     C: Cancellable,
+    E: HasLevelStorage,
 {
     pub fn new(token: C, generation: u64) -> Self {
         Self {
-            children: Mutex::new(array::from_fn(|_| None)),
+            children: Mutex::new(E::storage_from_fn(|_| None)),
             token,
             generation,
             result: Mutex::new(None),
@@ -108,7 +110,7 @@ where
         F: Fn(&S) -> Advanceable,
     {
         let mut may_advance = true;
-        for c in self.children.lock().iter() {
+        for c in self.children.lock().as_ref().iter() {
             match c {
                 None => may_advance = false,
                 Some(c) if c.result.lock().is_none() => may_advance = false,
@@ -124,32 +126,35 @@ where
     }
 }
 
-impl<E, C, S, const N: usize> Drop for TreeNode<E, C, S, N>
+impl<E, C, S> Drop for TreeNode<E, C, S>
 where
     C: Cancellable,
+    E: HasLevelStorage,
 {
     fn drop(&mut self) {
         self.token.cancel();
     }
 }
 
-pub struct Tree<E, C, S, const N: usize = 2>
+pub struct Tree<E, C, S>
 where
     C: Cancellable,
+    E: HasLevelStorage,
 {
-    children: Mutex<[Option<Arc<TreeNode<E, C, S, N>>>; N]>,
+    children: Mutex<E::LevelStorage<Option<Arc<TreeNode<E, C, S>>>>>,
 }
 
-impl<E, C, S, const N: usize> Tree<E, C, S, N>
+impl<E, C, S> Tree<E, C, S>
 where
     C: Cancellable,
+    E: HasLevelStorage,
 {
     pub fn may_advcance<F>(&self, f: F) -> bool
     where
         F: Fn(&S) -> Advanceable,
     {
         let mut may_advance = true;
-        for c in self.children.lock().iter() {
+        for c in self.children.lock().as_ref().iter() {
             match c {
                 None => may_advance = false,
                 Some(c) if c.result.lock().is_none() => may_advance = false,
@@ -167,30 +172,32 @@ where
 
 // TODO improve locking scheme in layout and usage
 
-pub struct BFScheduler<T, E, C, S, P, const N: usize = 2>
+pub struct BFScheduler<T, E, C, S, P>
 where
     C: Cancellable,
+    E: HasLevelStorage,
 {
     current_root: Mutex<T>,
     root_generation: AtomicU64,
 
-    tasks: Mutex<Tree<E, C, S, N>>,
-    frontier: Mutex<VecDeque<(RelativePath<E>, Weak<TreeNode<E, C, S, N>>)>>,
+    tasks: Mutex<Tree<E, C, S>>,
+    frontier: Mutex<VecDeque<(RelativePath<E>, Weak<TreeNode<E, C, S>>)>>,
 
     _result: PhantomData<(S, P)>,
 }
 
-impl<T, E, C, S, P, const N: usize> Default for BFScheduler<T, E, C, S, P, N>
+impl<T, E, C, S, P> Default for BFScheduler<T, E, C, S, P>
 where
     C: Cancellable,
     T: Default,
+    E: HasLevelStorage,
 {
     fn default() -> Self {
         Self {
             current_root: Mutex::default(),
             root_generation: AtomicU64::new(0),
             tasks: Mutex::new(Tree {
-                children: Mutex::new(array::from_fn(|_| None)),
+                children: Mutex::new(E::storage_from_fn(|_| None)),
             }),
             frontier: Mutex::new(VecDeque::new()),
             _result: PhantomData,
@@ -198,24 +205,25 @@ where
     }
 }
 
-impl<T, E, C, S, P, const N: usize> BFScheduler<T, E, C, S, P, N>
+impl<T, E, C, S, P> BFScheduler<T, E, C, S, P>
 where
     C: Cancellable,
     T: Default,
+    E: HasLevelStorage,
 {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl<T, E, C, S, P, const N: usize> StepScheduler<T, C> for BFScheduler<T, E, C, S, P, N>
+impl<T, E, C, S, P> StepScheduler<T, C> for BFScheduler<T, E, C, S, P>
 where
     C: Cancellable,
     T: EventReplay<EventType = E> + Clone,
     E: StaticEvent + Clone + Eq,
     P: SelectionPolicy<OracleEvent = S>,
 {
-    type ItemMeta = Weak<TreeNode<E, C, S, N>>;
+    type ItemMeta = Weak<TreeNode<E, C, S>>;
     type StateInterpretation = S;
 
     fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, C> {
@@ -233,9 +241,10 @@ where
         let mut root_children = tasks.children.lock();
 
         for (variant, child) in T::EventType::VARIANTS
+            .as_ref()
             .iter()
             .cloned()
-            .zip(root_children.iter_mut())
+            .zip(root_children.as_mut().iter_mut())
         {
             if child.is_some() {
                 continue;
@@ -274,9 +283,10 @@ where
             let mut children = parent_node_strong.children.lock();
 
             for (variant, child) in T::EventType::VARIANTS
+                .as_ref()
                 .iter()
                 .cloned()
-                .zip(children.iter_mut())
+                .zip(children.as_mut().iter_mut())
             {
                 if child.is_some() {
                     continue;
@@ -343,7 +353,11 @@ where
             // a) not a subtree of us
 
             // then drop all of our children. This will invalidate Weak references in frontier and tasks and ensure no further exploration. This is simply here because we may not be the last of our siblings to be done. in this case we can already remove our subtree
-            node.children.lock().iter_mut().for_each(|c| *c = None);
+            node.children
+                .lock()
+                .as_mut()
+                .iter_mut()
+                .for_each(|c| *c = None);
         }
 
         // reap all non-children and set as root if our generation == current_generation
@@ -362,9 +376,9 @@ where
             // walk our subtree until we find no new suitable root
             // finally update the tree root to drop all tasks not on our subtree and extend root path
 
-            let find_best = |children: &[Option<Arc<TreeNode<E, C, S, N>>>; N]| -> Option<(E, Arc<TreeNode<E, C, S, N>>)> {
+            let find_best = |children: &[Option<Arc<TreeNode<E, C, S>>>]| -> Option<(E, Arc<TreeNode<E, C, S>>)> {
                     let mut best = None;
-                    for (variant, child) in E::VARIANTS.iter().zip(children.iter()) {
+                    for (variant, child) in E::VARIANTS.as_ref().iter().zip(children.iter()) {
                         let Some(child) = child else { continue; };
                         let res_lock = child.result.lock();
                         let Some(res) = res_lock.as_ref() else { continue; };
@@ -377,7 +391,7 @@ where
                             return Some((variant.clone(), child.clone()));
                         }
 
-                        if best.as_ref().is_none_or(|(_, best): &(E, Arc<TreeNode<E, C, S, N>>)| {
+                        if best.as_ref().is_none_or(|(_, best): &(E, Arc<TreeNode<E, C, S>>)| {
                             P::compare(best.result.lock().as_ref().unwrap(), res) ==  core::cmp::Ordering::Less
                         }) {
                             best = Some((variant.clone(), child.clone()));
@@ -386,7 +400,7 @@ where
                     best
                 };
 
-            let Some((variant, mut lowest_node)) = find_best(&tasks.children.lock()) else {
+            let Some((variant, mut lowest_node)) = find_best(tasks.children.lock().as_ref()) else {
                 return;
             };
 
@@ -402,7 +416,7 @@ where
                 }) {
                     return ControlFlow::Break(());
                 }
-                if let Some((variant, next_node)) = find_best(&node.children.lock()) {
+                if let Some((variant, next_node)) = find_best(node.children.lock().as_ref()) {
                     acc.push(variant);
                     lowest_node = next_node.clone();
                     ControlFlow::Continue(next_node)
@@ -429,8 +443,11 @@ where
 
             root.extend_with_slice(&acc);
 
+            let lowest_children = lowest_node.children.lock();
             *tasks = Tree {
-                children: Mutex::new(lowest_node.children.lock().clone()),
+                children: Mutex::new(<E as HasLevelStorage>::storage_from_fn(|idx| {
+                    lowest_children.as_ref()[idx].clone()
+                })),
             };
         }
     }
@@ -442,6 +459,7 @@ where
             .lock()
             .children
             .lock()
+            .as_mut()
             .iter_mut()
             .for_each(|ele| *ele = None);
     }

@@ -16,10 +16,10 @@ pub mod traits {
 }
 
 pub mod schedule {
-    use ramis_core::{_is_valid, EventReplay, SearchDomain, SelectionPolicy, StaticEvent};
+    use ramis_core::{EventReplay, SearchDomain, SelectionPolicy, StaticEvent};
     use ramis_schedule::{BFScheduler, StepScheduler};
 
-    pub struct BFS<D: SearchDomain, const N: usize> {
+    pub struct BFS<D: SearchDomain> {
         #[allow(clippy::type_complexity)]
         inner: BFScheduler<
             D::Path,
@@ -27,11 +27,10 @@ pub mod schedule {
             D::Cancel,
             <D::Policy as SelectionPolicy>::OracleEvent,
             D::Policy,
-            N, // { <<D::Path as EventReplay>::EventType as StaticEvent>::BRANCHING_FACTOR },
         >,
     }
 
-    impl<D: SearchDomain, const N: usize> Default for BFS<D, N>
+    impl<D: SearchDomain> Default for BFS<D>
     where
         <D::Path as EventReplay>::EventType: Eq + Clone + StaticEvent,
         D::Path: Clone + Default,
@@ -41,27 +40,19 @@ pub mod schedule {
         }
     }
 
-    impl<D: SearchDomain, const N: usize> BFS<D, N>
+    impl<D: SearchDomain> BFS<D>
     where
         <D::Path as EventReplay>::EventType: Eq + Clone + StaticEvent,
         D::Path: Clone + Default,
     {
         pub fn new() -> Self {
-            #[allow(clippy::let_unit_value)]
-            const {
-                _ = <<D::Path as EventReplay>::EventType as _is_valid>::_is_valid;
-                assert!(
-                    N == <<D::Path as EventReplay>::EventType as StaticEvent>::BRANCHING_FACTOR,
-                    "N should be == to StaticEvent::N"
-                );
-            }
             Self {
                 inner: BFScheduler::new(),
             }
         }
     }
 
-    impl<D: SearchDomain, const N: usize> StepScheduler<D::Path, D::Cancel> for BFS<D, N>
+    impl<D: SearchDomain> StepScheduler<D::Path, D::Cancel> for BFS<D>
     where
         <D::Path as EventReplay>::EventType: Eq + Clone + StaticEvent,
         D::Path: Clone,
@@ -72,7 +63,6 @@ pub mod schedule {
             D::Cancel,
             <D::Policy as SelectionPolicy>::OracleEvent,
             D::Policy,
-            N, // { <<D::Path as EventReplay>::EventType as StaticEvent>::BRANCHING_FACTOR },
         > as StepScheduler<D::Path, D::Cancel>>::ItemMeta;
         type StateInterpretation = <D::Policy as SelectionPolicy>::OracleEvent;
 

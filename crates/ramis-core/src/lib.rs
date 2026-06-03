@@ -12,8 +12,9 @@ mod tape;
 pub use scheduled::*;
 pub use tape::*;
 
-pub trait SearchDomain // where
-//     <Self::Path as EventReplay>::EventType: StaticEvent,
+pub trait SearchDomain
+where
+    <Self::Path as EventReplay>::EventType: HasLevelStorage,
 {
     type Path: EventReplay;
     type Cancel: Cancellable;

@@ -44,7 +44,7 @@ async fn main() {
 
     let start_time = Instant::now();
     let mut handles = Vec::new();
-    let scheduler: Arc<BFS<ReductionAlgorithm, 2>> = Arc::new(BFS::new());
+    let scheduler: Arc<BFS<ReductionAlgorithm>> = Arc::new(BFS::new());
 
     for _ in 0..num_workers {
         let sched_clone = scheduler.clone();

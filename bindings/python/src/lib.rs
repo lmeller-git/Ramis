@@ -1,7 +1,14 @@
-use std::sync::Weak;
+use std::{array, sync::Weak};
 
 use pyo3::prelude::*;
-use ramis_core::{Cancellable, EventReplay, ScheduledStep, SelectionPolicy, StaticEvent};
+use ramis_core::{
+    Cancellable,
+    EventReplay,
+    HasLevelStorage,
+    ScheduledStep,
+    SelectionPolicy,
+    StaticEvent,
+};
 use ramis_schedule::{BFScheduler as RawBFScheduler, StepScheduler, TreeNode};
 
 pub struct PyCancelToken(Py<PyAny>);
@@ -19,8 +26,7 @@ impl Cancellable for PyCancelToken {
 
 #[pyclass]
 pub struct BFScheduler {
-    inner:
-        RawBFScheduler<DDMinPath, DDMinEvent, PyCancelToken, DDMinEvent, DDMinEventInterpretor, 2>,
+    inner: RawBFScheduler<DDMinPath, DDMinEvent, PyCancelToken, DDMinEvent, DDMinEventInterpretor>,
 }
 
 #[pymethods]
@@ -50,7 +56,7 @@ impl BFScheduler {
 #[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyScheduledStep(
-    Option<ScheduledStep<DDMinPath, Weak<TreeNode<DDMinEvent, PyCancelToken, DDMinEvent, 2>>>>,
+    Option<ScheduledStep<DDMinPath, Weak<TreeNode<DDMinEvent, PyCancelToken, DDMinEvent>>>>,
 );
 
 #[pymethods]
@@ -109,9 +115,19 @@ impl From<DDMinEventType> for DDMinEvent {
     }
 }
 
+impl HasLevelStorage for DDMinEvent {
+    type LevelStorage<T> = [T; 2];
+
+    fn storage_from_fn<T, F>(f: F) -> Self::LevelStorage<T>
+    where
+        F: FnMut(usize) -> T,
+    {
+        array::from_fn(f)
+    }
+}
+
 impl StaticEvent for DDMinEvent {
-    const BRANCHING_FACTOR: usize = 2;
-    const VARIANTS: &'static [Self] = &[Self(true), Self(false)];
+    const VARIANTS: &'static Self::LevelStorage<Self> = &[Self(true), Self(false)];
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]

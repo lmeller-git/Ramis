@@ -1,7 +1,10 @@
-use std::sync::{Arc, atomic::AtomicBool};
+use std::{
+    array,
+    sync::{Arc, atomic::AtomicBool},
+};
 
 use im::Vector;
-use ramis_core::{Cancellable, EventReplay, SelectionPolicy, StaticEvent};
+use ramis_core::{Cancellable, EventReplay, HasLevelStorage, SelectionPolicy, StaticEvent};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct MockPath {
@@ -31,9 +34,19 @@ impl EventReplay for MockPath {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MockEvent(pub bool);
 
+impl HasLevelStorage for MockEvent {
+    type LevelStorage<T> = [T; 2];
+
+    fn storage_from_fn<T, F>(f: F) -> Self::LevelStorage<T>
+    where
+        F: FnMut(usize) -> T,
+    {
+        array::from_fn(f)
+    }
+}
+
 impl StaticEvent for MockEvent {
-    const BRANCHING_FACTOR: usize = 2;
-    const VARIANTS: &'static [Self] = &[Self(true), Self(false)];
+    const VARIANTS: &'static Self::LevelStorage<Self> = &[Self(true), Self(false)];
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]

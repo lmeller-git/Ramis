@@ -11,27 +11,15 @@ pub trait DynamicEventReplay: EventReplay {
     fn children(&self) -> impl Iterator<Item = Self>;
 }
 
-pub trait StaticEvent: Sized + 'static {
-    const VARIANTS: &'static [Self];
-    const BRANCHING_FACTOR: usize;
+pub trait HasLevelStorage {
+    type LevelStorage<T>: AsRef<[T]> + AsMut<[T]>;
+    fn storage_from_fn<T, F>(f: F) -> Self::LevelStorage<T>
+    where
+        F: FnMut(usize) -> T;
 }
 
-#[allow(non_camel_case_types)]
-pub trait _is_valid {
-    #[allow(non_upper_case_globals)]
-    const _is_valid: ();
-}
-
-impl<T> _is_valid for T
-where
-    T: StaticEvent,
-{
-    const _is_valid: () = const {
-        assert!(
-            Self::VARIANTS.len() == Self::BRANCHING_FACTOR,
-            "branching factor of a staticevent should be == number of variants"
-        )
-    };
+pub trait StaticEvent: HasLevelStorage + Sized + 'static {
+    const VARIANTS: &Self::LevelStorage<Self>;
 }
 
 impl<T> DynamicEventReplay for T
@@ -40,11 +28,15 @@ where
     T::EventType: StaticEvent + Clone,
 {
     fn children(&self) -> impl Iterator<Item = Self> {
-        T::EventType::VARIANTS.iter().cloned().map(|segment| {
-            let mut t_clone = self.clone();
-            t_clone.push(segment);
-            t_clone
-        })
+        T::EventType::VARIANTS
+            .as_ref()
+            .iter()
+            .cloned()
+            .map(|segment| {
+                let mut t_clone = self.clone();
+                t_clone.push(segment);
+                t_clone
+            })
     }
 }
 

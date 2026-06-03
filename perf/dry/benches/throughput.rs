@@ -26,7 +26,6 @@ fn bench_scheduler_throughput(c: &mut Criterion) {
                     MockCancelToken,
                     MockInterpretation,
                     BooleanAcceptor,
-                    2,
                 >::new())
             },
             |scheduler| {
@@ -54,7 +53,6 @@ fn bench_scheduler_throughput(c: &mut Criterion) {
                     MockCancelToken,
                     MockInterpretation,
                     BooleanAcceptor,
-                    2,
                 >::new())
             },
             |scheduler| {
