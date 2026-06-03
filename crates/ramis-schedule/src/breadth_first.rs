@@ -1,13 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use alloc::collections::VecDeque;
-use core::{
-    hash::Hash,
-    iter::once,
-    marker::PhantomData,
-    ops::ControlFlow,
-    sync::atomic::AtomicU64,
-};
+use core::{hash::Hash, iter::once, marker::PhantomData, ops::ControlFlow};
 
 use ramis_core::{
     Cancellable,
@@ -16,7 +10,12 @@ use ramis_core::{
     ScheduledStep,
     SelectionPolicy,
     StaticEvent,
-    sync::{Arc, Mutex, Weak, atomic::Ordering},
+    sync::{
+        Arc,
+        Mutex,
+        Weak,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 use smallvec::SmallVec;
 

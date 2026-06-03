@@ -141,6 +141,7 @@ where
                     if old <= 1 {
                         break;
                     }
+                    ramis_core::sync::hint::spin_loop();
                 }
             });
         }
@@ -163,7 +164,7 @@ where
     const COUNT: usize = 20_000;
 
     let current_count = ramis_core::sync::atomic::AtomicUsize::new(COUNT);
-    let kill_this_counter = ramis_core::sync::atomic::AtomicBool::new(false);
+    let kill_this_counter = ramis_core::sync::atomic::AtomicUsize::new(0);
 
     ramis_core::sync::thread::scope(|scope| {
         for _ in 0..workers {
@@ -184,9 +185,9 @@ where
                     black_box(&item);
 
                     let kill_this =
-                        kill_this_counter.fetch_not(core::sync::atomic::Ordering::AcqRel);
+                        kill_this_counter.fetch_add(1, core::sync::atomic::Ordering::AcqRel);
 
-                    let res = if kill_this {
+                    let res = if kill_this.is_multiple_of(10) {
                         MockOracleEvent::Dead
                     } else {
                         MockOracleEvent::Alive(42)
@@ -197,6 +198,7 @@ where
                     if old <= 1 {
                         break;
                     }
+                    ramis_core::sync::hint::spin_loop();
                 }
             });
         }

@@ -9,6 +9,8 @@ extern crate alloc;
 pub mod event;
 pub mod oracle;
 pub mod path;
+
+#[cfg(any(test, feature = "std"))]
 pub mod test_impls;
 
 #[derive(Debug, Clone, Default)]

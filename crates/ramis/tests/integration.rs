@@ -55,10 +55,7 @@ fn test_get_put_sequential_bfs() {
 
 #[test]
 fn test_get_put_concurrent_bfs() {
-    #[cfg(not(any(shuttle, loom)))]
     mpmc_concurrent::<BFS<SimplDomain<Triplet>>, Triplet>(16);
-    #[cfg(any(shuttle, loom))]
-    mpmc_concurrent::<BFS<SimplDomain<Triplet>>, Triplet>(8);
 }
 
 #[test]
@@ -68,8 +65,30 @@ fn test_get_put_prune_sequential_bfs() {
 
 #[test]
 fn test_get_put_prune_concurrent_bfs() {
-    #[cfg(not(any(shuttle, loom)))]
     mpmc_concurrent_pruned::<BFS<SimplDomain<Triplet>>, Triplet>(16);
-    #[cfg(any(shuttle, loom))]
-    mpmc_concurrent_pruned::<BFS<SimplDomain<Triplet>>, Triplet>(8);
+}
+
+#[cfg(shuttle)]
+mod shuttle_ {
+    use super::*;
+
+    #[test]
+    fn get_put_shuttle_bfs() {
+        shuttle::check_random(
+            || {
+                mpmc_concurrent::<BFS<SimplDomain<Triplet>>, Triplet>(8);
+            },
+            100,
+        )
+    }
+
+    #[test]
+    fn get_put_pruned_shuttle_bfs() {
+        shuttle::check_random(
+            || {
+                mpmc_concurrent_pruned::<BFS<SimplDomain<Triplet>>, Triplet>(8);
+            },
+            100,
+        )
+    }
 }
