@@ -1,7 +1,16 @@
 use std::{sync::Arc, time::Instant};
 
-use ramis_schedule::BFScheduler;
+use dry::MockPath;
+use ramis::{schedule::BFS, traits::SearchDomain};
 use reduce::*;
+
+struct ReductionAlgorithm;
+
+impl SearchDomain for ReductionAlgorithm {
+    type Cancel = MockCancelToken;
+    type Path = MockPath;
+    type Policy = MockResultInterpretor;
+}
 
 #[tokio::main]
 async fn main() {
@@ -35,16 +44,7 @@ async fn main() {
 
     let start_time = Instant::now();
     let mut handles = Vec::new();
-    let scheduler: Arc<
-        BFScheduler<
-            dry::MockPath,
-            dry::MockEvent,
-            MockCancelToken,
-            MockInterpretationResult,
-            MockResultInterpretor,
-            2,
-        >,
-    > = Arc::new(BFScheduler::new());
+    let scheduler: Arc<BFS<ReductionAlgorithm, 2>> = Arc::new(BFS::new());
 
     for _ in 0..num_workers {
         let sched_clone = scheduler.clone();
@@ -59,5 +59,12 @@ async fn main() {
     }
 
     println!("Benchmark Complete in: {:.2?}", start_time.elapsed());
-    println!("Minimized query: {:?}", MINIMAL.0.lock().unwrap());
+
+    let minimized = MINIMAL.0.lock().unwrap();
+
+    println!(
+        "Minimized query: {:?}\n length: {}",
+        minimized,
+        minimized.len()
+    );
 }

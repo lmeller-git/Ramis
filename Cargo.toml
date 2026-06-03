@@ -22,3 +22,4 @@ repository = ""
 ramis-core = { path = "./crates/ramis-core" }
 ramis-schedule = { path = "./crates/ramis-schedule" }
 ramis = { path = "crates/ramis" }
+lock_api = "0.4.14"

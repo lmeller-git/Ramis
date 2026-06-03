@@ -32,6 +32,7 @@ impl EventReplay for MockPath {
 pub struct MockEvent(pub bool);
 
 impl StaticEvent for MockEvent {
+    const BRANCHING_FACTOR: usize = 2;
     const VARIANTS: &'static [Self] = &[Self(true), Self(false)];
 }
 
@@ -40,7 +41,9 @@ pub struct MockInterpretation(pub bool);
 
 pub struct BooleanAcceptor;
 
-impl SelectionPolicy<MockInterpretation> for BooleanAcceptor {
+impl SelectionPolicy for BooleanAcceptor {
+    type OracleEvent = MockInterpretation;
+
     fn compare(a: &MockInterpretation, b: &MockInterpretation) -> std::cmp::Ordering {
         a.cmp(b)
     }

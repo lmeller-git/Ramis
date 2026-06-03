@@ -871,6 +871,7 @@ dependencies = [
 name = "ramis-core"
 version = "0.1.0"
 dependencies = [
+ "lock_api",
  "loom",
  "portable-atomic",
  "shuttle",
@@ -881,6 +882,7 @@ dependencies = [
 name = "ramis-schedule"
 version = "0.1.0"
 dependencies = [
+ "lock_api",
  "ramis-core",
  "smallvec",
 ]
@@ -985,8 +987,7 @@ version = "0.1.0"
 dependencies = [
  "dry",
  "im",
- "ramis-core",
- "ramis-schedule",
+ "ramis",
  "rand 0.10.1",
  "tokio",
  "tokio-util",

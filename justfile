@@ -5,7 +5,10 @@ build-py:
     uv sync
 
 test-rust:
-    cargo test --workspace --exclude lib_ramis --all-targets
+        cargo test --exclude lib-ramis --workspace --locked --all-features --all-targets
+        cargo test --exclude lib-ramis --workspace --locked --all-features --doc
+        cargo test -p lib-ramis --no-default-features --locked --all-targets
+        cargo test -p lib-ramis --no-default-features --locked --doc
 
 test-py: build-py
     uv run pytest
@@ -18,3 +21,12 @@ lint:
     uv run ruff check python
     uv run ruff format --check python
     uv run pyright
+
+docs:
+    cargo +nightly docs-rs -p ramis
+    cargo +nightly docs-rs -p lib-ramis
+
+hack:
+    cargo hack --feature-powerset check
+
+check: lint docs hack

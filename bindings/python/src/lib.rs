@@ -110,6 +110,7 @@ impl From<DDMinEventType> for DDMinEvent {
 }
 
 impl StaticEvent for DDMinEvent {
+    const BRANCHING_FACTOR: usize = 2;
     const VARIANTS: &'static [Self] = &[Self(true), Self(false)];
 }
 
@@ -125,7 +126,9 @@ impl DDMinEventInterpretor {
     }
 }
 
-impl SelectionPolicy<DDMinEvent> for DDMinEventInterpretor {
+impl SelectionPolicy for DDMinEventInterpretor {
+    type OracleEvent = DDMinEvent;
+
     fn compare(a: &DDMinEvent, b: &DDMinEvent) -> std::cmp::Ordering {
         a.0.cmp(&b.0)
     }

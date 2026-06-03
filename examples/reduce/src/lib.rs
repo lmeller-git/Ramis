@@ -4,8 +4,7 @@ use std::{
 };
 
 use dry::MockPath;
-use ramis_core::{Cancellable, SelectionPolicy};
-use ramis_schedule::StepScheduler;
+use ramis::traits::{Cancellable, SelectionPolicy, StepScheduler};
 use tokio_util::sync::CancellationToken;
 
 #[derive(Clone, Debug, Default)]
@@ -43,7 +42,9 @@ pub enum MockInterpretationResult {
 
 pub struct MockResultInterpretor;
 
-impl SelectionPolicy<MockInterpretationResult> for MockResultInterpretor {
+impl SelectionPolicy for MockResultInterpretor {
+    type OracleEvent = MockInterpretationResult;
+
     fn compare(a: &MockInterpretationResult, b: &MockInterpretationResult) -> std::cmp::Ordering {
         match (a, b) {
             (

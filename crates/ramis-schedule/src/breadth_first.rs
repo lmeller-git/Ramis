@@ -208,28 +208,12 @@ where
     }
 }
 
-impl<T, E, C, S, P, const N: usize> BFScheduler<T, E, C, S, P, N>
-where
-    C: Cancellable,
-    T: EventReplay<EventType = E> + Clone + Hash + Eq,
-    E: StaticEvent + Clone + Hash + Eq,
-    P: SelectionPolicy<S>,
-{
-    #[allow(non_upper_case_globals)]
-    const _is_valid: () = const {
-        assert!(
-            N == E::VARIANTS.len(),
-            "BFScheduler::N should be equal to BFScheduler::E::VARIANTS.len()"
-        )
-    };
-}
-
 impl<T, E, C, S, P, const N: usize> StepScheduler<T, C> for BFScheduler<T, E, C, S, P, N>
 where
     C: Cancellable,
     T: EventReplay<EventType = E> + Clone,
     E: StaticEvent + Clone + Eq,
-    P: SelectionPolicy<S>,
+    P: SelectionPolicy<OracleEvent = S>,
 {
     type ItemMeta = Weak<TreeNode<E, C, S, N>>;
     type StateInterpretation = S;

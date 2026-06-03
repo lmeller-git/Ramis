@@ -13,6 +13,25 @@ pub trait DynamicEventReplay: EventReplay {
 
 pub trait StaticEvent: Sized + 'static {
     const VARIANTS: &'static [Self];
+    const BRANCHING_FACTOR: usize;
+}
+
+#[allow(non_camel_case_types)]
+pub trait _is_valid {
+    #[allow(non_upper_case_globals)]
+    const _is_valid: ();
+}
+
+impl<T> _is_valid for T
+where
+    T: StaticEvent,
+{
+    const _is_valid: () = const {
+        assert!(
+            Self::VARIANTS.len() == Self::BRANCHING_FACTOR,
+            "branching factor of a staticevent should be == number of variants"
+        )
+    };
 }
 
 impl<T> DynamicEventReplay for T
@@ -29,8 +48,9 @@ where
     }
 }
 
-pub trait SelectionPolicy<S> {
-    fn compare(a: &S, b: &S) -> Ordering;
-    fn may_reject(s: &S) -> bool;
-    fn may_accept(s: &S) -> bool;
+pub trait SelectionPolicy {
+    type OracleEvent;
+    fn compare(a: &Self::OracleEvent, b: &Self::OracleEvent) -> Ordering;
+    fn may_reject(s: &Self::OracleEvent) -> bool;
+    fn may_accept(s: &Self::OracleEvent) -> bool;
 }
