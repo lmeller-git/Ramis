@@ -2,6 +2,7 @@ use std::{array, sync::Weak};
 
 use pyo3::prelude::*;
 use ramis_core::{
+    Algorithm,
     Cancellable,
     EventReplay,
     HasLevelStorage,
@@ -24,9 +25,27 @@ impl Cancellable for PyCancelToken {
     }
 }
 
+pub struct PushAlgorithm;
+
+impl Algorithm<DDMinPath, DDMinEvent> for PushAlgorithm {
+    type Error = ();
+
+    fn step(state: &mut DDMinPath, event: DDMinEvent) -> Result<(), Self::Error> {
+        state.push(event);
+        Ok(())
+    }
+}
+
 #[pyclass]
 pub struct BFScheduler {
-    inner: RawBFScheduler<DDMinPath, DDMinEvent, PyCancelToken, DDMinEvent, DDMinEventInterpretor>,
+    inner: RawBFScheduler<
+        DDMinPath,
+        DDMinEvent,
+        PyCancelToken,
+        DDMinEvent,
+        DDMinEventInterpretor,
+        PushAlgorithm,
+    >,
 }
 
 #[pymethods]
@@ -34,7 +53,7 @@ impl BFScheduler {
     #[new]
     fn new() -> Self {
         Self {
-            inner: RawBFScheduler::new(),
+            inner: RawBFScheduler::default(),
         }
     }
 

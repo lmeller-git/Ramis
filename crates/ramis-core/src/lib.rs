@@ -7,16 +7,22 @@ extern crate alloc;
 
 mod scheduled;
 pub mod sync;
-mod tape;
+mod trace;
+
+use core::fmt::Debug;
 
 pub use scheduled::*;
-pub use tape::*;
+pub use trace::*;
 
-pub trait SearchDomain
-where
-    <Self::Path as EventReplay>::EventType: HasLevelStorage,
-{
-    type Path: EventReplay;
-    type Cancel: Cancellable;
+pub trait Algorithm<State, Event> {
+    type Error: Debug;
+
+    fn step(state: &mut State, event: Event) -> Result<(), Self::Error>;
+}
+
+pub trait SearchDomain {
+    type State;
+    type Event: StaticEvent;
     type Policy: SelectionPolicy;
+    type Algorithm: Algorithm<Self::State, Self::Event>;
 }

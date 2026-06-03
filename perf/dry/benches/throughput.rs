@@ -1,7 +1,14 @@
 use std::{hint::black_box, sync::Arc, thread};
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use dry::{BooleanAcceptor, MockCancelToken, MockEvent, MockInterpretation, MockPath};
+use dry::{
+    BooleanAcceptor,
+    MockCancelToken,
+    MockEvent,
+    MockInterpretation,
+    MockPath,
+    PushAlgorithm,
+};
 use ramis_schedule::{BFScheduler, StepScheduler};
 
 // benchmarks llm generated
@@ -26,7 +33,8 @@ fn bench_scheduler_throughput(c: &mut Criterion) {
                     MockCancelToken,
                     MockInterpretation,
                     BooleanAcceptor,
-                >::new())
+                    PushAlgorithm,
+                >::default())
             },
             |scheduler| {
                 for _ in 0..operations_per_iter {
@@ -53,7 +61,8 @@ fn bench_scheduler_throughput(c: &mut Criterion) {
                     MockCancelToken,
                     MockInterpretation,
                     BooleanAcceptor,
-                >::new())
+                    PushAlgorithm,
+                >::default())
             },
             |scheduler| {
                 let num_workers = 5;

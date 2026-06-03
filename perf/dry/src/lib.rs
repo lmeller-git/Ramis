@@ -4,7 +4,14 @@ use std::{
 };
 
 use im::Vector;
-use ramis_core::{Cancellable, EventReplay, HasLevelStorage, SelectionPolicy, StaticEvent};
+use ramis_core::{
+    Algorithm,
+    Cancellable,
+    EventReplay,
+    HasLevelStorage,
+    SelectionPolicy,
+    StaticEvent,
+};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct MockPath {
@@ -95,5 +102,16 @@ impl Cancellable for MockCancelToken {
 
     fn is_cancelled(&self) -> bool {
         self.is_cancelled.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+pub struct PushAlgorithm;
+
+impl Algorithm<MockPath, MockEvent> for PushAlgorithm {
+    type Error = ();
+
+    fn step(state: &mut MockPath, event: MockEvent) -> Result<(), Self::Error> {
+        state.push(event);
+        Ok(())
     }
 }

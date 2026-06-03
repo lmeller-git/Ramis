@@ -4,72 +4,67 @@
 extern crate std;
 
 pub mod traits {
-    pub use ramis_core::{
-        Cancellable,
-        DynamicEventReplay,
-        EventReplay,
-        SearchDomain,
-        SelectionPolicy,
-        StaticEvent,
-    };
+    pub use ramis_core::{Algorithm, Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
     pub use ramis_schedule::StepScheduler;
 }
 
 pub mod schedule {
-    use ramis_core::{EventReplay, SearchDomain, SelectionPolicy, StaticEvent};
+    use ramis_core::{Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
     use ramis_schedule::{BFScheduler, StepScheduler};
 
     #[allow(type_alias_bounds)]
-    type RawBFS<D: SearchDomain> = BFScheduler<
-        D::Path,
-        <D::Path as EventReplay>::EventType,
-        D::Cancel,
+    type RawBFS<D: SearchDomain, C: Cancellable> = BFScheduler<
+        D::State,
+        D::Event,
+        C,
         <D::Policy as SelectionPolicy>::OracleEvent,
         D::Policy,
+        D::Algorithm,
     >;
 
-    pub struct BFS<D: SearchDomain> {
-        inner: RawBFS<D>,
+    pub struct BFS<D: SearchDomain, C: Cancellable> {
+        inner: RawBFS<D, C>,
     }
 
-    impl<D: SearchDomain> Default for BFS<D>
+    impl<D: SearchDomain, C> Default for BFS<D, C>
     where
-        D::Path: Default,
+        D::State: Default,
+        C: Cancellable,
     {
         fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl<D: SearchDomain> BFS<D>
-    where
-        D::Path: Default,
-    {
-        pub fn new() -> Self {
             Self {
-                inner: BFScheduler::new(),
+                inner: BFScheduler::default(),
             }
         }
     }
 
-    impl<D: SearchDomain> StepScheduler<D::Path, D::Cancel> for BFS<D>
+    impl<D: SearchDomain, C> BFS<D, C>
     where
-        <D::Path as EventReplay>::EventType: Clone + StaticEvent,
-        D::Path: Clone,
+        C: Cancellable,
     {
-        type ItemMeta = <RawBFS<D> as StepScheduler<D::Path, D::Cancel>>::ItemMeta;
+        pub fn new(state: D::State) -> Self {
+            Self {
+                inner: BFScheduler::new(state),
+            }
+        }
+    }
+
+    impl<D: SearchDomain, C> StepScheduler<D::State, C> for BFS<D, C>
+    where
+        D::Event: Clone + StaticEvent,
+        D::State: Clone,
+        C: Cancellable,
+    {
+        type ItemMeta = <RawBFS<D, C> as StepScheduler<D::State, C>>::ItemMeta;
         type StateInterpretation = <D::Policy as SelectionPolicy>::OracleEvent;
 
-        fn next(
-            &self,
-            token: D::Cancel,
-        ) -> Result<ramis_core::ScheduledStep<D::Path, Self::ItemMeta>, D::Cancel> {
+        fn next(&self, token: C) -> Result<ramis_core::ScheduledStep<D::State, Self::ItemMeta>, C> {
             self.inner.next(token)
         }
 
         fn put_result(
             &self,
-            path: ramis_core::ScheduledStep<D::Path, Self::ItemMeta>,
+            path: ramis_core::ScheduledStep<D::State, Self::ItemMeta>,
             event: Self::StateInterpretation,
         ) {
             self.inner.put_result(path, event);
@@ -79,7 +74,7 @@ pub mod schedule {
             self.inner.notify_done();
         }
 
-        fn is_cancelled(&self, item: &ramis_core::ScheduledStep<D::Path, Self::ItemMeta>) -> bool {
+        fn is_cancelled(&self, item: &ramis_core::ScheduledStep<D::State, Self::ItemMeta>) -> bool {
             self.inner.is_cancelled(item)
         }
     }

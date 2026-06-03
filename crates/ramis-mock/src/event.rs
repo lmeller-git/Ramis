@@ -1,4 +1,17 @@
-use ramis_core::{HasLevelStorage, StaticEvent, generate_static_event};
+use ramis_core::{Algorithm, EventReplay, HasLevelStorage, StaticEvent, generate_static_event};
+
+use crate::path::SimplePath;
+
+pub struct PushAlgorithm;
+
+impl<E: StaticEvent + Clone> Algorithm<SimplePath<E>, E> for PushAlgorithm {
+    type Error = ();
+
+    fn step(state: &mut SimplePath<E>, event: E) -> Result<(), Self::Error> {
+        state.push(event);
+        Ok(())
+    }
+}
 
 generate_static_event! {
     pub enum Flat {

@@ -4,6 +4,7 @@ use alloc::collections::VecDeque;
 use core::{hash::Hash, iter::once, marker::PhantomData, ops::ControlFlow};
 
 use ramis_core::{
+    Algorithm,
     Cancellable,
     EventReplay,
     HasLevelStorage,
@@ -171,7 +172,7 @@ where
 
 // TODO improve locking scheme in layout and usage
 
-pub struct BFScheduler<T, E, C, S, P>
+pub struct BFScheduler<T, E, C, S, P, A>
 where
     C: Cancellable,
     E: HasLevelStorage,
@@ -182,18 +183,28 @@ where
     tasks: Mutex<Tree<E, C, S>>,
     frontier: Mutex<VecDeque<(RelativePath<E>, Weak<TreeNode<E, C, S>>)>>,
 
-    _result: PhantomData<(S, P)>,
+    _result: PhantomData<(S, P, A)>,
 }
 
-impl<T, E, C, S, P> Default for BFScheduler<T, E, C, S, P>
+impl<T, E, C, S, P, A> Default for BFScheduler<T, E, C, S, P, A>
 where
     C: Cancellable,
     T: Default,
     E: HasLevelStorage,
 {
     fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
+impl<T, E, C, S, P, A> BFScheduler<T, E, C, S, P, A>
+where
+    C: Cancellable,
+    E: HasLevelStorage,
+{
+    pub fn new(state: T) -> Self {
         Self {
-            current_root: Mutex::default(),
+            current_root: Mutex::new(state),
             root_generation: AtomicU64::new(0),
             tasks: Mutex::new(Tree {
                 children: Mutex::new(E::storage_from_fn(|_| None)),
@@ -204,23 +215,13 @@ where
     }
 }
 
-impl<T, E, C, S, P> BFScheduler<T, E, C, S, P>
+impl<T, E, C, S, P, A> StepScheduler<T, C> for BFScheduler<T, E, C, S, P, A>
 where
     C: Cancellable,
-    T: Default,
-    E: HasLevelStorage,
-{
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl<T, E, C, S, P> StepScheduler<T, C> for BFScheduler<T, E, C, S, P>
-where
-    C: Cancellable,
-    T: EventReplay<EventType = E> + Clone,
+    T: Clone,
     E: StaticEvent + Clone + Eq,
     P: SelectionPolicy<OracleEvent = S>,
+    A: Algorithm<T, E>,
 {
     type ItemMeta = Weak<TreeNode<E, C, S>>;
     type StateInterpretation = S;
@@ -243,7 +244,7 @@ where
 
         let mut root_children = tasks.children.lock();
 
-        for (variant, child) in T::EventType::VARIANTS
+        for (variant, child) in E::VARIANTS
             .as_ref()
             .iter()
             .cloned()
@@ -253,17 +254,20 @@ where
                 continue;
             }
 
+            let mut path_stem = root.clone();
+            if let Err(_e) = A::step(&mut path_stem, variant.clone()) {
+                return Err(token);
+            }
+
             let node = Arc::new(TreeNode::new(token, current_gen + 1));
             let weak = Arc::downgrade(&node);
             *child = Some(node);
 
             frontier.push_back((
-                RelativePath::new_from(current_gen, once(variant.clone())),
+                RelativePath::new_from(current_gen, once(variant)),
                 weak.clone(),
             ));
 
-            let mut path_stem = root.clone();
-            path_stem.push(variant);
             return Ok(ScheduledStep::new(path_stem, weak));
         }
         // drop(root_children);
@@ -285,7 +289,7 @@ where
 
             let mut children = parent_node_strong.children.lock();
 
-            for (variant, child) in T::EventType::VARIANTS
+            for (variant, child) in E::VARIANTS
                 .as_ref()
                 .iter()
                 .cloned()
@@ -314,16 +318,21 @@ where
                     rel_path.generation = current_gen;
                 }
 
-                let node = Arc::new(TreeNode::new(token, parent_node_strong.generation + 1));
-                let weak = Arc::downgrade(&node);
-                *child = Some(node);
-
                 let mut child_path =
                     RelativePath::new_from(rel_path.generation, rel_path.path.iter().cloned());
                 child_path.push(variant.clone());
 
                 let mut path_stem = root;
-                path_stem.extend_with_slice(&child_path.path);
+                for ev in child_path.path.iter().cloned() {
+                    if let Err(_e) = A::step(&mut path_stem, ev) {
+                        // do not push back anything, as this state seems to be corrupted
+                        return Err(token);
+                    }
+                }
+
+                let node = Arc::new(TreeNode::new(token, parent_node_strong.generation + 1));
+                let weak = Arc::downgrade(&node);
+                *child = Some(node);
 
                 frontier.push_front((rel_path, parent_node));
                 frontier.push_back((child_path, weak.clone()));
@@ -444,7 +453,9 @@ where
                 return;
             }
 
-            root.extend_with_slice(&acc);
+            for ev in acc.into_iter() {
+                A::step(&mut root, ev).expect("Algorihtm erred in put_result. This should not happen, as the exact same state was previously evaluated in next.");
+            }
 
             let lowest_children = lowest_node.children.lock();
             *tasks = Tree {

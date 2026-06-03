@@ -1,15 +1,16 @@
 use std::{sync::Arc, time::Instant};
 
-use dry::MockPath;
+use dry::{MockEvent, MockPath, PushAlgorithm};
 use ramis::{schedule::BFS, traits::SearchDomain};
 use reduce::*;
 
 struct ReductionAlgorithm;
 
 impl SearchDomain for ReductionAlgorithm {
-    type Cancel = MockCancelToken;
-    type Path = MockPath;
+    type Algorithm = PushAlgorithm;
+    type Event = MockEvent;
     type Policy = MockResultInterpretor;
+    type State = MockPath;
 }
 
 #[tokio::main]
@@ -44,7 +45,7 @@ async fn main() {
 
     let start_time = Instant::now();
     let mut handles = Vec::new();
-    let scheduler: Arc<BFS<ReductionAlgorithm>> = Arc::new(BFS::new());
+    let scheduler: Arc<BFS<ReductionAlgorithm, MockCancelToken>> = Arc::new(BFS::default());
 
     for _ in 0..num_workers {
         let sched_clone = scheduler.clone();
