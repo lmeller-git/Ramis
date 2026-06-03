@@ -3,6 +3,7 @@ default:
 
 build-py:
     uv sync
+    uv run maturin develop
 
 test-rust:
         cargo test --exclude lib-ramis --workspace --locked --all-features --all-targets
