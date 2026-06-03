@@ -79,7 +79,7 @@ mod shuttle_ {
             || {
                 mpmc_concurrent::<BFS<SimplDomain<Triplet>, MockCancel>, Triplet>(8);
             },
-            100,
+            1000,
         )
     }
 
@@ -89,7 +89,7 @@ mod shuttle_ {
             || {
                 mpmc_concurrent_pruned::<BFS<SimplDomain<Triplet>, MockCancel>, Triplet>(8);
             },
-            100,
+            1000,
         )
     }
 }

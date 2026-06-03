@@ -72,6 +72,7 @@ where
     E: HasLevelStorage,
 {
     children: Mutex<E::LevelStorage<Option<Arc<TreeNode<E, C, S>>>>>,
+    parent: Option<Weak<Self>>,
     token: C,
     generation: u64,
     result: Mutex<Option<S>>,
@@ -83,12 +84,13 @@ where
     C: Cancellable,
     E: HasLevelStorage,
 {
-    pub fn new(token: C, generation: u64) -> Self {
+    pub fn new(token: C, generation: u64, parent: Option<Weak<Self>>) -> Self {
         Self {
             children: Mutex::new(E::storage_from_fn(|_| None)),
             token,
             generation,
             result: Mutex::new(None),
+            parent,
             _phantom: PhantomData,
         }
     }
@@ -251,7 +253,7 @@ where
                 .zip(root_children.as_mut().iter_mut())
             {
                 if child.is_none() {
-                    let node = Arc::new(TreeNode::new(token.clone(), current_gen + 1));
+                    let node = Arc::new(TreeNode::new(token.clone(), current_gen + 1, None));
                     let weak = Arc::downgrade(&node);
                     *child = Some(node);
 
@@ -262,7 +264,9 @@ where
                 }
             }
 
-            while let Some((mut rel_path, parent_node)) = frontier.pop_front() {
+            drop(root_children);
+
+            'outer: while let Some((mut rel_path, parent_node)) = frontier.pop_front() {
                 let Some(parent_node_strong) = parent_node.upgrade() else {
                     continue;
                 };
@@ -271,6 +275,7 @@ where
                     .lock()
                     .as_ref()
                     .is_some_and(P::may_reject)
+                    || parent_node_strong.generation < current_gen + 1
                 {
                     continue;
                 }
@@ -285,6 +290,33 @@ where
                     if child.is_none() {
                         let current_gen = self.root_generation.load(Ordering::Acquire);
                         if rel_path.generation < current_gen {
+                            // walk parents until root to ensure we are on the correct lineage
+                            let mut curr = parent_node_strong.clone();
+                            while curr.generation > current_gen + 1 {
+                                let Some(parent) = curr.parent.as_ref().and_then(|p| p.upgrade())
+                                else {
+                                    break;
+                                };
+                                curr = parent;
+                            }
+
+                            // no parent can ever be commited, just abort this lineage
+                            if curr.generation != current_gen + 1 {
+                                continue 'outer;
+                            }
+
+                            let root_children = tasks.children.lock();
+                            let is_valid = root_children
+                                .as_ref()
+                                .iter()
+                                .any(|c| c.as_ref().is_some_and(|n| Arc::ptr_eq(n, &curr)));
+                            drop(root_children);
+
+                            // our root is NOT in the global root. We are on a lineage that is deattached from root
+                            if !is_valid {
+                                continue 'outer;
+                            }
+
                             rel_path
                                 .path
                                 .drain(..(current_gen - rel_path.generation) as usize);
@@ -300,7 +332,9 @@ where
                         let node = Arc::new(TreeNode::new(
                             token.clone(),
                             parent_node_strong.generation + 1,
+                            Some(parent_node.clone()),
                         ));
+
                         let weak = Arc::downgrade(&node);
                         *child = Some(node);
 
@@ -316,7 +350,7 @@ where
 
         for ev in path_to_apply {
             if let Err(_e) = A::step(&mut state, ev) {
-                // since we put the node into th tree already, we should try to mark it as dead
+                // since we put the node into the tree already, we should try to mark it as dead
                 // we can also immediately reap all of its children, as we did just put this node back into the queue
                 // This does NOT ensure that no other thread runs a child/puts one back into the queue.
                 // All remaining children will be reaped on the next root advance.
