@@ -8,6 +8,7 @@ use ramis_core::{
     Cancellable,
     EventReplay,
     HasLevelStorage,
+    OracleEvent,
     ScheduledStep,
     SelectionPolicy,
     StaticEvent,
@@ -217,178 +218,172 @@ where
 
 impl<T, E, C, S, P, A> StepScheduler<T, C> for BFScheduler<T, E, C, S, P, A>
 where
-    C: Cancellable,
+    C: Cancellable + Clone,
     T: Clone,
     E: StaticEvent + Clone + Eq,
     P: SelectionPolicy<OracleEvent = S>,
     A: Algorithm<T, E>,
+    S: OracleEvent + Clone,
 {
     type ItemMeta = Weak<TreeNode<E, C, S>>;
     type StateInterpretation = S;
 
     fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, C> {
-        // TODO we can recheck generation every now and then and restart if it has advanced
-        let mut frontier = self.frontier.lock();
+        // TODO we could recheck generation in the loop and restart if it does not match anymore
+        let (mut state, path_to_apply, weak) = 'get: {
+            let mut frontier = self.frontier.lock();
+            let tasks = self.tasks.lock();
 
-        // tasks (root) is empty at the beginning (and may be empty later on too)
-        let tasks = self.tasks.lock();
-
-        let root_guard = self.current_root.lock();
-        let current_gen = self.root_generation.load(Ordering::Acquire);
-        if current_gen == u64::MAX {
-            return Err(token);
-        }
-
-        let root = root_guard.clone();
-        drop(root_guard);
-
-        let mut root_children = tasks.children.lock();
-
-        for (variant, child) in E::VARIANTS
-            .as_ref()
-            .iter()
-            .cloned()
-            .zip(root_children.as_mut().iter_mut())
-        {
-            if child.is_some() {
-                continue;
-            }
-
-            let mut path_stem = root.clone();
-            if let Err(_e) = A::step(&mut path_stem, variant.clone()) {
+            let root_guard = self.current_root.lock();
+            let current_gen = self.root_generation.load(Ordering::Acquire);
+            if current_gen == u64::MAX {
                 return Err(token);
             }
+            let root = root_guard.clone();
+            drop(root_guard);
 
-            let node = Arc::new(TreeNode::new(token, current_gen + 1));
-            let weak = Arc::downgrade(&node);
-            *child = Some(node);
-
-            frontier.push_back((
-                RelativePath::new_from(current_gen, once(variant)),
-                weak.clone(),
-            ));
-
-            return Ok(ScheduledStep::new(path_stem, weak));
-        }
-        // drop(root_children);
-        // drop(tasks);
-
-        while let Some((mut rel_path, parent_node)) = frontier.pop_front() {
-            let Some(parent_node_strong) = parent_node.upgrade() else {
-                continue;
-            };
-
-            if parent_node_strong
-                .result
-                .lock()
-                .as_ref()
-                .is_some_and(P::may_reject)
-            {
-                continue;
-            }
-
-            let mut children = parent_node_strong.children.lock();
+            let mut root_children = tasks.children.lock();
 
             for (variant, child) in E::VARIANTS
                 .as_ref()
                 .iter()
                 .cloned()
-                .zip(children.as_mut().iter_mut())
+                .zip(root_children.as_mut().iter_mut())
             {
-                if child.is_some() {
+                if child.is_none() {
+                    let node = Arc::new(TreeNode::new(token.clone(), current_gen + 1));
+                    let weak = Arc::downgrade(&node);
+                    *child = Some(node);
+
+                    let rel_path = RelativePath::new_from(current_gen, once(variant.clone()));
+                    frontier.push_back((rel_path.clone(), weak.clone()));
+
+                    break 'get (root.clone(), rel_path.path, weak);
+                }
+            }
+
+            while let Some((mut rel_path, parent_node)) = frontier.pop_front() {
+                let Some(parent_node_strong) = parent_node.upgrade() else {
+                    continue;
+                };
+                if parent_node_strong
+                    .result
+                    .lock()
+                    .as_ref()
+                    .is_some_and(P::may_reject)
+                {
                     continue;
                 }
 
-                let current_gen = self.root_generation.load(Ordering::Acquire);
+                let mut children = parent_node_strong.children.lock();
+                for (variant, child) in E::VARIANTS
+                    .as_ref()
+                    .iter()
+                    .cloned()
+                    .zip(children.as_mut().iter_mut())
+                {
+                    if child.is_none() {
+                        let current_gen = self.root_generation.load(Ordering::Acquire);
+                        if rel_path.generation < current_gen {
+                            rel_path
+                                .path
+                                .drain(..(current_gen - rel_path.generation) as usize);
+                            rel_path.generation = current_gen;
+                        }
 
-                if parent_node_strong.generation < current_gen {
-                    // should be unreachable
-                    unreachable!();
-                }
+                        let mut child_path = RelativePath::new_from(
+                            rel_path.generation,
+                            rel_path.path.iter().cloned(),
+                        );
+                        child_path.push(variant);
 
-                if rel_path.generation < current_gen {
-                    if (rel_path.generation + rel_path.path.len() as u64) < current_gen {
-                        // too far behind. should be unreachable
-                        unreachable!();
+                        let node = Arc::new(TreeNode::new(
+                            token.clone(),
+                            parent_node_strong.generation + 1,
+                        ));
+                        let weak = Arc::downgrade(&node);
+                        *child = Some(node);
+
+                        frontier.push_front((rel_path, parent_node));
+                        frontier.push_back((child_path.clone(), weak.clone()));
+
+                        break 'get (root.clone(), child_path.path, weak);
                     }
-
-                    rel_path
-                        .path
-                        .drain(..(current_gen - rel_path.generation) as usize);
-                    rel_path.generation = current_gen;
                 }
+            }
+            return Err(token);
+        };
 
-                let mut child_path =
-                    RelativePath::new_from(rel_path.generation, rel_path.path.iter().cloned());
-                child_path.push(variant.clone());
-
-                let mut path_stem = root;
-                for ev in child_path.path.iter().cloned() {
-                    if let Err(_e) = A::step(&mut path_stem, ev) {
-                        // do not push back anything, as this state seems to be corrupted
-                        return Err(token);
-                    }
+        for ev in path_to_apply {
+            if let Err(_e) = A::step(&mut state, ev) {
+                // since we put the node into th tree already, we should try to mark it as dead
+                // we can also immediately reap all of its children, as we did just put this node back into the queue
+                // This does NOT ensure that no other thread runs a child/puts one back into the queue.
+                // All remaining children will be reaped on the next root advance.
+                if let Some(strong) = weak.upgrade() {
+                    let mut r_lock = strong.result.lock();
+                    debug_assert!(r_lock.is_none(), "someone else evaluated our node??");
+                    *r_lock = Some(<S as OracleEvent>::DEAD.clone());
+                    drop(r_lock);
+                    let mut children = strong.children.lock();
+                    children.as_mut().iter_mut().for_each(|child| *child = None);
                 }
-
-                let node = Arc::new(TreeNode::new(token, parent_node_strong.generation + 1));
-                let weak = Arc::downgrade(&node);
-                *child = Some(node);
-
-                frontier.push_front((rel_path, parent_node));
-                frontier.push_back((child_path, weak.clone()));
-
-                return Ok(ScheduledStep::new(path_stem, weak));
+                return Err(token);
             }
         }
-        Err(token)
+
+        Ok(ScheduledStep::new(state, weak))
     }
 
     fn put_result(&self, path: ScheduledStep<T, Self::ItemMeta>, event: Self::StateInterpretation) {
-        let mut tasks = self.tasks.lock();
+        let advancement_data = {
+            let tasks = self.tasks.lock();
 
-        let Some(node) = path.meta().upgrade() else {
-            // already cancelled
-            return;
-        };
+            let Some(node) = path.meta().upgrade() else {
+                // already cancelled
+                return;
+            };
 
-        let current_generation = self.root_generation.load(Ordering::Acquire);
+            let current_generation = self.root_generation.load(Ordering::Acquire);
 
-        let item_gen = node.generation;
+            let item_gen = node.generation;
 
-        *node.result.lock() = Some(event);
+            *node.result.lock() = Some(event);
 
-        if node.result.lock().as_ref().is_some_and(P::may_reject) {
-            // reap all children
-            // Note that it is possible for a child to be correct. Since we do not search for global optimum, this does not matter. Any path to q-minimality is fine.
+            if node.result.lock().as_ref().is_some_and(P::may_reject) {
+                // reap all children
+                // Note that it is possible for a child to be correct. Since we do not search for global optimum, this does not matter. Any path to q-minimality is fine.
 
-            // retain all branches that are
-            // a) not a subtree of us
+                // retain all branches that are
+                // a) not a subtree of us
 
-            // then drop all of our children. This will invalidate Weak references in frontier and tasks and ensure no further exploration. This is simply here because we may not be the last of our siblings to be done. in this case we can already remove our subtree
-            node.children
-                .lock()
-                .as_mut()
-                .iter_mut()
-                .for_each(|c| *c = None);
-        }
+                // then drop all of our children.
+                // This will invalidate Weak references in frontier and tasks and ensure no further exploration (because tasks is locked right now, no radce exists).
+                // This is simply here because we may not be the last of our siblings to be done. in this case we can already remove our subtree
+                node.children
+                    .lock()
+                    .as_mut()
+                    .iter_mut()
+                    .for_each(|c| *c = None);
+            }
 
-        // reap all non-children and set as root if our generation == current_generation
-        // We check if all siblings of node are done. We know that nodes siblings are roots chidlren, since our generation is root_gen + 1
+            // reap all non-children and set as root if our generation == current_generation
+            // We check if all siblings of node are done. We know that nodes siblings are roots chidlren, since our generation is root_gen + 1
 
-        if item_gen == current_generation + 1
-            && tasks.may_advcance(|r| {
-                if P::may_accept(r) {
-                    Advanceable::Force
-                } else {
-                    Advanceable::May
-                }
-            })
-        {
-            // we are now the new root.
-            // walk our subtree until we find no new suitable root
-            // finally update the tree root to drop all tasks not on our subtree and extend root path
+            if item_gen == current_generation + 1
+                && tasks.may_advcance(|r| {
+                    if P::may_accept(r) {
+                        Advanceable::Force
+                    } else {
+                        Advanceable::May
+                    }
+                })
+            {
+                // we are now the new root.
+                // walk our subtree until we find no new suitable root
+                // finally update the tree root to drop all tasks not on our subtree and extend root path
 
-            let find_best = |children: &[Option<Arc<TreeNode<E, C, S>>>]| -> Option<(E, Arc<TreeNode<E, C, S>>)> {
+                let find_best = |children: &[Option<Arc<TreeNode<E, C, S>>>]| -> Option<(E, Arc<TreeNode<E, C, S>>)> {
                     let mut best = None;
                     for (variant, child) in E::VARIANTS.as_ref().iter().zip(children.iter()) {
                         let Some(child) = child else { continue; };
@@ -412,32 +407,59 @@ where
                     best
                 };
 
-            let Some((variant, mut lowest_node)) = find_best(tasks.children.lock().as_ref()) else {
-                return;
+                let Some((variant, mut lowest_node)) = find_best(tasks.children.lock().as_ref())
+                else {
+                    return;
+                };
+
+                let mut acc = alloc::vec![variant];
+
+                TreeNode::walk_subtree(lowest_node.clone(), &mut |node| {
+                    if !node.may_advcance(|r| {
+                        if P::may_accept(r) {
+                            Advanceable::Force
+                        } else {
+                            Advanceable::May
+                        }
+                    }) {
+                        return ControlFlow::Break(());
+                    }
+                    if let Some((variant, next_node)) = find_best(node.children.lock().as_ref()) {
+                        acc.push(variant);
+                        lowest_node = next_node.clone();
+                        ControlFlow::Continue(next_node)
+                    } else {
+                        ControlFlow::Break(())
+                    }
+                });
+
+                Some((acc, lowest_node, current_generation))
+            } else {
+                None
+            }
+        };
+
+        if let Some((acc, lowest_node, current_generation)) = advancement_data {
+            // we clone first, drop guard, step and finally lock again in order to allow concurrent workers to continue running
+            // root needs to be locked by next and put_result().
+            // If we keep it locked during a potentially long step(), we could serialize the scheduler
+            // HOWEVER this means that
+            // a) a lot of work is potentially wasted in concurretn workers (as we will advance thge root soon, dropping many paths)
+            // b) more clones than necessary are performed here. If State is very heavy, this could be very bad
+            //
+            // TODO we should maybe allow the user to make this choice, or do some benchmarking
+            let mut new_root = {
+                let guard = self.current_root.lock();
+                guard.clone()
             };
 
-            let mut acc = alloc::vec![variant];
+            for ev in acc {
+                A::step(&mut new_root, ev).expect("Algorihtm erred in put_result. This should not happen, as the exact same state was previously evaluated in next.");
+            }
 
-            TreeNode::walk_subtree(lowest_node.clone(), &mut |node| {
-                if !node.may_advcance(|r| {
-                    if P::may_accept(r) {
-                        Advanceable::Force
-                    } else {
-                        Advanceable::May
-                    }
-                }) {
-                    return ControlFlow::Break(());
-                }
-                if let Some((variant, next_node)) = find_best(node.children.lock().as_ref()) {
-                    acc.push(variant);
-                    lowest_node = next_node.clone();
-                    ControlFlow::Continue(next_node)
-                } else {
-                    ControlFlow::Break(())
-                }
-            });
+            let mut tasks = self.tasks.lock();
+            let mut root_guard = self.current_root.lock();
 
-            let mut root = self.current_root.lock();
             if self
                 .root_generation
                 .compare_exchange(
@@ -446,23 +468,18 @@ where
                     Ordering::AcqRel,
                     Ordering::Acquire,
                 )
-                .is_err()
+                .is_ok()
             {
-                // some one else updated root before we could do it
-                // there is nothing that needs to be done now, as our subtree is already droped
-                return;
-            }
+                // we won any possible race to the root update and can safely update the root
+                *root_guard = new_root;
 
-            for ev in acc.into_iter() {
-                A::step(&mut root, ev).expect("Algorihtm erred in put_result. This should not happen, as the exact same state was previously evaluated in next.");
+                let lowest_children = lowest_node.children.lock();
+                *tasks = Tree {
+                    children: Mutex::new(<E as HasLevelStorage>::storage_from_fn(|idx| {
+                        lowest_children.as_ref()[idx].clone()
+                    })),
+                };
             }
-
-            let lowest_children = lowest_node.children.lock();
-            *tasks = Tree {
-                children: Mutex::new(<E as HasLevelStorage>::storage_from_fn(|idx| {
-                    lowest_children.as_ref()[idx].clone()
-                })),
-            };
         }
     }
 

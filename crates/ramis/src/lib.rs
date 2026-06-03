@@ -4,7 +4,15 @@
 extern crate std;
 
 pub mod traits {
-    pub use ramis_core::{Algorithm, Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
+    pub use ramis_core::{
+        Algorithm,
+        Cancellable,
+        HasLevelStorage,
+        OracleEvent,
+        SearchDomain,
+        SelectionPolicy,
+        StaticEvent,
+    };
     pub use ramis_schedule::StepScheduler;
 }
 
@@ -53,7 +61,8 @@ pub mod schedule {
     where
         D::Event: Clone + StaticEvent,
         D::State: Clone,
-        C: Cancellable,
+        C: Cancellable + Clone,
+        <D::Policy as SelectionPolicy>::OracleEvent: Clone,
     {
         type ItemMeta = <RawBFS<D, C> as StepScheduler<D::State, C>>::ItemMeta;
         type StateInterpretation = <D::Policy as SelectionPolicy>::OracleEvent;

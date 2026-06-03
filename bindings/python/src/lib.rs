@@ -6,13 +6,16 @@ use ramis_core::{
     Cancellable,
     EventReplay,
     HasLevelStorage,
+    OracleEvent,
     ScheduledStep,
     SelectionPolicy,
     StaticEvent,
+    sync::Arc,
 };
 use ramis_schedule::{BFScheduler as RawBFScheduler, StepScheduler, TreeNode};
 
-pub struct PyCancelToken(Py<PyAny>);
+#[derive(Clone)]
+pub struct PyCancelToken(Arc<Py<PyAny>>);
 
 impl Cancellable for PyCancelToken {
     fn cancel(&self) {
@@ -60,7 +63,7 @@ impl BFScheduler {
     fn next(&self, cancel_token: Py<PyAny>) -> PyResult<Option<PyScheduledStep>> {
         Ok(self
             .inner
-            .next(PyCancelToken(cancel_token))
+            .next(PyCancelToken(cancel_token.into()))
             .ok()
             .map(|step| PyScheduledStep(Some(step))))
     }
@@ -128,6 +131,11 @@ type DDMinEventType = bool;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash)]
 pub struct DDMinEvent(DDMinEventType);
 
+impl OracleEvent for DDMinEvent {
+    const ACCEPTED: Option<&Self> = None;
+    const DEAD: &Self = &Self(false);
+}
+
 impl From<DDMinEventType> for DDMinEvent {
     fn from(value: DDMinEventType) -> Self {
         Self(value)
@@ -172,8 +180,8 @@ impl SelectionPolicy for DDMinEventInterpretor {
         !s.0
     }
 
-    fn may_accept(s: &DDMinEvent) -> bool {
-        s.0
+    fn may_accept(_s: &DDMinEvent) -> bool {
+        false
     }
 }
 

@@ -1,4 +1,4 @@
-use ramis_core::SelectionPolicy;
+use ramis_core::{OracleEvent, SelectionPolicy};
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -6,6 +6,11 @@ pub enum MockOracleEvent {
     Dead = 0,
     Accept = 2,
     Alive(u8) = 1,
+}
+
+impl OracleEvent for MockOracleEvent {
+    const ACCEPTED: Option<&Self> = Some(&Self::Accept);
+    const DEAD: &Self = &Self::Dead;
 }
 
 pub struct MockPolicy;

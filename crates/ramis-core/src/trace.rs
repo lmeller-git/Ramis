@@ -40,11 +40,22 @@ where
     }
 }
 
+pub trait OracleEvent: 'static + PartialEq {
+    const DEAD: &Self;
+    const ACCEPTED: Option<&Self>;
+}
+
 pub trait SelectionPolicy {
-    type OracleEvent;
+    type OracleEvent: OracleEvent;
     fn compare(a: &Self::OracleEvent, b: &Self::OracleEvent) -> Ordering;
-    fn may_reject(s: &Self::OracleEvent) -> bool;
-    fn may_accept(s: &Self::OracleEvent) -> bool;
+
+    fn may_reject(s: &Self::OracleEvent) -> bool {
+        s == Self::OracleEvent::DEAD
+    }
+
+    fn may_accept(s: &Self::OracleEvent) -> bool {
+        Self::OracleEvent::ACCEPTED.is_some_and(|ev| ev == s)
+    }
 }
 
 #[macro_export]

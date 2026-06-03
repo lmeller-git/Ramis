@@ -9,6 +9,7 @@ use ramis_core::{
     Cancellable,
     EventReplay,
     HasLevelStorage,
+    OracleEvent,
     SelectionPolicy,
     StaticEvent,
 };
@@ -58,6 +59,11 @@ impl StaticEvent for MockEvent {
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct MockInterpretation(pub bool);
+
+impl OracleEvent for MockInterpretation {
+    const ACCEPTED: Option<&Self> = Some(&Self(true));
+    const DEAD: &Self = &Self(false);
+}
 
 pub struct BooleanAcceptor;
 

@@ -4,7 +4,7 @@ use std::{
 };
 
 use dry::MockPath;
-use ramis::traits::{Cancellable, SelectionPolicy, StepScheduler};
+use ramis::traits::{Cancellable, OracleEvent, SelectionPolicy, StepScheduler};
 use tokio_util::sync::CancellationToken;
 
 #[derive(Clone, Debug, Default)]
@@ -38,6 +38,11 @@ impl Cancellable for MockCancelToken {
 pub enum MockInterpretationResult {
     Dead,
     Valid { length: usize },
+}
+
+impl OracleEvent for MockInterpretationResult {
+    const ACCEPTED: Option<&Self> = None;
+    const DEAD: &Self = &Self::Dead;
 }
 
 pub struct MockResultInterpretor;
