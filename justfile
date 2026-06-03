@@ -13,7 +13,7 @@ test-py: build-py
 test: test-rust test-py
 
 lint:
-    cargo fmt --all -- --check
+    cargo +nightly fmt --all -- --check
     cargo clippy --workspace --all-targets -- -D warnings
     uv run ruff check python
     uv run ruff format --check python
