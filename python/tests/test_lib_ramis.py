@@ -1,6 +1,7 @@
 from typing import override
 from lib_ramis import PyState, CancelToken, GenericResult
 from lib_ramis.binary import Binary, BinaryBFS
+from lib_ramis.traced import Trace, TracedBFS
 
 # --- 1. Mock Subclasses for Testing ---
 
@@ -87,7 +88,7 @@ def test_bfs_scheduler_loop():
     step2 = scheduler.next(token)
     assert step2 is not None
 
-    state2: CounterState  = step2.state()
+    state2: CounterState = step2.state()
     assert state2.value in (1, -1)
     assert state1.value != state2.value
 
@@ -106,6 +107,37 @@ def test_bfs_cancellation():
     assert result is not None
 
     scheduler.notify_done()
-    next = scheduler.next(token)
+    next_step = scheduler.next(token)
 
-    assert next is None
+    assert next_step is None
+
+
+def test_traced_bfs_scheduler_loop():
+    """
+    Integration test: drives the TracedBFS scheduler.
+    """
+    token = SimpleToken()
+
+    scheduler = TracedBFS()
+
+    step1 = scheduler.next(token)
+    assert step1 is not None
+
+    trace1 = step1.path()
+    assert isinstance(trace1, Trace)
+
+    list1 = trace1.to_list()
+    assert len(list1) == 1
+    assert isinstance(list1[0], bool)
+
+    scheduler.put_result(step1, GenericResult(1))
+
+    step2 = scheduler.next(token)
+    assert step2 is not None
+
+    trace2 = step2.path()
+    list2 = trace2.to_list()
+    assert len(list2) == 1
+    assert list1[0] != list2[0]
+
+    scheduler.notify_done()

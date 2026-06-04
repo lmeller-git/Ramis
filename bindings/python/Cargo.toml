@@ -16,7 +16,7 @@ default = ["extension-module"]
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
-pyo3 = { version = "0.28.2" }
+pyo3 = { version = "0.28.2", features = ["multiple-pymethods"] }
 ramis-core = { workspace = true, features = ["std"] }
 ramis-schedule = { workspace = true, features = ["std"] }
 ramis = { workspace = true, features = ["std"] }

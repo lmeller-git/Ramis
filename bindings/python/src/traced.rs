@@ -5,7 +5,13 @@ use ramis::schedule::BFS;
 use ramis_core::{Algorithm, HasLevelStorage, ScheduledStep, SearchDomain, StaticEvent};
 use ramis_schedule::StepScheduler;
 
-use crate::{CancelToken, GenericResult, GenericResultInterpretor, PyCancelToken};
+use crate::{
+    CancelToken,
+    GenericResult,
+    GenericResultInterpretor,
+    PyCancelToken,
+    generate_bfs_bindings,
+};
 
 #[pyclass(from_py_object)]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
@@ -66,20 +72,6 @@ impl Algorithm<Trace, TraceEvent> for PushAlgorithm {
     }
 }
 
-#[allow(clippy::type_complexity)]
-#[pyclass(from_py_object)]
-#[derive(Clone, Debug)]
-pub struct TracedStep(
-    Option<ScheduledStep<Trace, <TracedBFS as StepScheduler<Trace, PyCancelToken>>::ItemMeta>>,
-);
-
-#[pymethods]
-impl TracedStep {
-    pub fn path(&self) -> Trace {
-        self.0.as_ref().map(|step| step.path().clone()).unwrap()
-    }
-}
-
 pub struct TracedAlgoDomain;
 
 impl SearchDomain for TracedAlgoDomain {
@@ -89,73 +81,21 @@ impl SearchDomain for TracedAlgoDomain {
     type State = Trace;
 }
 
-#[pyclass]
-pub struct TracedBFS {
-    raw: BFS<TracedAlgoDomain, PyCancelToken>,
+generate_bfs_bindings!(TracedBFS, TracedStep, TracedAlgoDomain, Trace);
+
+#[pymethods]
+impl TracedStep {
+    pub fn path(&self) -> Trace {
+        self.0.as_ref().map(|step| step.path().clone()).unwrap()
+    }
 }
 
 #[pymethods]
 impl TracedBFS {
     #[new]
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             raw: BFS::default(),
         }
-    }
-
-    pub fn next(&self, cancel_token: Py<CancelToken>) -> PyResult<Option<TracedStep>> {
-        Ok(<Self as StepScheduler<Trace, PyCancelToken>>::next(
-            self,
-            PyCancelToken(cancel_token.into()),
-        )
-        .ok()
-        .map(|step| TracedStep(Some(step))))
-    }
-
-    pub fn put_result(&self, mut step: PyRefMut<TracedStep>, result: GenericResult) {
-        <Self as StepScheduler<Trace, PyCancelToken>>::put_result(
-            self,
-            step.0.take().unwrap(),
-            result,
-        );
-    }
-
-    pub fn notify_done(&self) {
-        <Self as StepScheduler<Trace, PyCancelToken>>::notify_done(self);
-    }
-
-    pub fn is_cancelled(&self, item: PyRef<TracedStep>) -> bool {
-        item.0.as_ref().is_some_and(|item| {
-            <Self as StepScheduler<Trace, PyCancelToken>>::is_cancelled(self, item)
-        })
-    }
-}
-
-impl StepScheduler<Trace, PyCancelToken> for TracedBFS {
-    type ItemMeta =
-        <BFS<TracedAlgoDomain, PyCancelToken> as StepScheduler<Trace, PyCancelToken>>::ItemMeta;
-    type StateInterpretation = GenericResult;
-
-    fn next(
-        &self,
-        token: PyCancelToken,
-    ) -> Result<ScheduledStep<Trace, Self::ItemMeta>, PyCancelToken> {
-        self.raw.next(token)
-    }
-
-    fn put_result(
-        &self,
-        state: ScheduledStep<Trace, Self::ItemMeta>,
-        event: Self::StateInterpretation,
-    ) {
-        self.raw.put_result(state, event);
-    }
-
-    fn notify_done(&self) {
-        self.raw.notify_done();
-    }
-
-    fn is_cancelled(&self, item: &ScheduledStep<Trace, Self::ItemMeta>) -> bool {
-        self.raw.is_cancelled(item)
     }
 }

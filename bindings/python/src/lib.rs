@@ -10,6 +10,7 @@ use crate::{
 };
 
 mod binary;
+mod macros;
 mod traced;
 
 #[pyclass(subclass, from_py_object)]
