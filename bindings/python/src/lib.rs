@@ -207,5 +207,8 @@ impl SelectionPolicy for DDMinEventInterpretor {
 fn lib_ramis(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<DDMinPath>()?;
     m.add_class::<BFScheduler>()?;
+    m.add_class::<ReductionStepResult>()?;
+    m.add_class::<DDMinEventInterpretor>()?;
+    m.add_class::<PyScheduledStep>()?;
     Ok(())
 }
