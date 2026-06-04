@@ -14,12 +14,14 @@ impl<E: StaticEvent + Clone> Algorithm<SimplePath<E>, E> for PushAlgorithm {
 }
 
 generate_static_event! {
+    #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
     pub enum Flat {
         V,
     }
 }
 
 generate_static_event! {
+    #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
     pub enum Boolean {
         V1,
         V2,
@@ -27,6 +29,7 @@ generate_static_event! {
 }
 
 generate_static_event! {
+    #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
     pub enum Triplet {
         V1,
         V2,

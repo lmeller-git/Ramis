@@ -555,6 +555,7 @@ name = "lib-ramis"
 version = "0.1.0"
 dependencies = [
  "pyo3",
+ "ramis",
  "ramis-core",
  "ramis-schedule",
 ]

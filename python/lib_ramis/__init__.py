@@ -1,15 +1,19 @@
 from .lib_ramis import (
-    DDMinPath,
-    BFScheduler,
-    ReductionStepResult,
-    PyScheduledStep,
-    DDMinEventInterpretor,
+    CancelToken,
+    PyState,
+    GenericResult,
+    GenericResultInterpretor
 )
 
+# Import the local python wrapper modules
+from . import binary
+from . import traced
+
 __all__ = [
-    "DDMinPath",
-    "BFScheduler",
-    "ReductionStepResult",
-    "PyScheduledStep",
-    "DDMinEventInterpretor",
+    "CancelToken",
+    "PyState",
+    "GenericResult",
+    "GenericResultInterpretor",
+    "binary",
+    "traced",
 ]

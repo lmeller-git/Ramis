@@ -82,11 +82,12 @@ pub trait SelectionPolicy {
 /// generates an enum implementing `StaticEvent` and `HasLevelStorage` given the enum variants. The storage of this type is an array.
 macro_rules! generate_static_event {
     (
+        $(#[$attr:meta])*
         $vis:vis enum $name:ident {
             $($variant:ident),+ $(,)?
         }
     ) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        $(#[$attr])*
         $vis enum $name {
             $($variant),+
         }
