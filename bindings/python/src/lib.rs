@@ -173,6 +173,18 @@ impl ReductionStepResult {
     pub fn new(r: u8) -> Self {
         Self(r)
     }
+
+    pub fn is_dead(&self) -> bool {
+        self == Self::DEAD
+    }
+
+    pub fn is_accepted(&self) -> bool {
+        Self::ACCEPTED.is_some_and(|acc| acc == self)
+    }
+
+    pub fn raw_score(&self) -> u8 {
+        self.0
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
