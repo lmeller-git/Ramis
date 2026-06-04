@@ -8,6 +8,7 @@ from .lib_ramis import (
 # Import the local python wrapper modules
 from . import binary
 from . import traced
+from . import nary
 
 __all__ = [
     "CancelToken",
@@ -16,4 +17,5 @@ __all__ = [
     "GenericResultInterpretor",
     "binary",
     "traced",
+    "nary"
 ]

@@ -6,11 +6,13 @@ use ramis_core::{Algorithm, Cancellable, OracleEvent, SelectionPolicy, sync::Arc
 
 use crate::{
     binary::{Binary, BinaryBFS, BinaryBFSStep},
+    nary::create_nary_scheduler,
     traced::{Trace, TracedBFS, TracedStep},
 };
 
 mod binary;
 mod macros;
+mod nary;
 mod traced;
 
 #[pyclass(subclass, from_py_object)]
@@ -168,6 +170,12 @@ fn lib_ramis(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     binary.add_class::<BinaryBFSStep>()?;
 
     m.add_submodule(&binary)?;
+
+    let nary = &PyModule::new(py, "nary")?;
+
+    nary.add_function(wrap_pyfunction!(create_nary_scheduler, nary)?)?;
+
+    m.add_submodule(nary)?;
 
     Ok(())
 }

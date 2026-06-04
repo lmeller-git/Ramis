@@ -1,0 +1,27 @@
+from typing import Protocol
+
+from lib_ramis import CancelToken, PyState, GenericResult
+
+class NAryEvent(Protocol):
+    @property
+    def index(self) -> int: ...
+
+
+class NAryStep(Protocol):
+    @property
+    def event(self) -> NAryEvent: ...
+
+
+class NAryScheduler(Protocol):
+    @property
+    def branching_factor(self) -> int: ...
+    def next(self, cancel_token: CancelToken) -> NAryStep| None: ...
+
+    def put_result(self, step: NAryStep, result: GenericResult) -> None: ...
+
+    def notify_done(self) -> None: ...
+
+    def is_cancelled(self, item: NAryStep) -> bool: ...
+
+
+def create_nary_scheduler(branching_factor: int, state: PyState) -> NAryScheduler: ...

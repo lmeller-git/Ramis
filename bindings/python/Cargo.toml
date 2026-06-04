@@ -20,3 +20,4 @@ pyo3 = { version = "0.28.2", features = ["multiple-pymethods"] }
 ramis-core = { workspace = true, features = ["std"] }
 ramis-schedule = { workspace = true, features = ["std"] }
 ramis = { workspace = true, features = ["std"] }
+paste = "1.0.15"

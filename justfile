@@ -10,6 +10,7 @@ test-rust:
         cargo test --exclude lib-ramis --workspace --locked --all-features --doc
         cargo test -p lib-ramis --no-default-features --locked --all-targets
         cargo test -p lib-ramis --no-default-features --locked --doc
+        RUSTFLAGS="--cfg shuttle" cargo test --release --locked -p ramis
 
 test-py: build-py
     uv run pytest
