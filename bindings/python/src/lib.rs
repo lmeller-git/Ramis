@@ -45,7 +45,7 @@ pub struct BFScheduler {
         DDMinPath,
         DDMinEvent,
         PyCancelToken,
-        DDMinEvent,
+        ReductionStepResult,
         DDMinEventInterpretor,
         PushAlgorithm,
     >,
@@ -68,9 +68,8 @@ impl BFScheduler {
             .map(|step| PyScheduledStep(Some(step))))
     }
 
-    fn put_result(&self, mut path: PyRefMut<PyScheduledStep>, event: DDMinEventType) {
-        self.inner
-            .put_result(path.0.take().unwrap(), DDMinEvent(event));
+    fn put_result(&self, mut path: PyRefMut<PyScheduledStep>, event: ReductionStepResult) {
+        self.inner.put_result(path.0.take().unwrap(), event);
     }
 }
 
@@ -78,7 +77,9 @@ impl BFScheduler {
 #[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyScheduledStep(
-    Option<ScheduledStep<DDMinPath, Weak<TreeNode<DDMinEvent, PyCancelToken, DDMinEvent>>>>,
+    Option<
+        ScheduledStep<DDMinPath, Weak<TreeNode<DDMinEvent, PyCancelToken, ReductionStepResult>>>,
+    >,
 );
 
 #[pymethods]
@@ -157,6 +158,23 @@ impl StaticEvent for DDMinEvent {
     const VARIANTS: &'static Self::LevelStorage<Self> = &[Self(true), Self(false)];
 }
 
+#[pyclass(from_py_object)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ReductionStepResult(u8);
+
+impl OracleEvent for ReductionStepResult {
+    const ACCEPTED: Option<&Self> = None;
+    const DEAD: &Self = &Self(0);
+}
+
+#[pymethods]
+impl ReductionStepResult {
+    #[staticmethod]
+    pub fn new(r: u8) -> Self {
+        Self(r)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
 #[pyclass(from_py_object)]
 pub struct DDMinEventInterpretor;
@@ -170,17 +188,17 @@ impl DDMinEventInterpretor {
 }
 
 impl SelectionPolicy for DDMinEventInterpretor {
-    type OracleEvent = DDMinEvent;
+    type OracleEvent = ReductionStepResult;
 
-    fn compare(a: &DDMinEvent, b: &DDMinEvent) -> std::cmp::Ordering {
-        a.0.cmp(&b.0)
+    fn compare(a: &Self::OracleEvent, b: &Self::OracleEvent) -> std::cmp::Ordering {
+        a.cmp(b)
     }
 
-    fn may_reject(s: &DDMinEvent) -> bool {
-        !s.0
+    fn may_reject(s: &Self::OracleEvent) -> bool {
+        s.0 == 0
     }
 
-    fn may_accept(_s: &DDMinEvent) -> bool {
+    fn may_accept(_s: &Self::OracleEvent) -> bool {
         false
     }
 }
