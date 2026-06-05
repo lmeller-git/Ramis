@@ -96,7 +96,7 @@ where
 pub struct GenericResult(u64);
 
 impl OracleEvent for GenericResult {
-    const ACCEPTED: Option<&Self> = None;
+    const ACCEPTED: Option<&Self> = Some(&Self(u64::MAX));
     const DEAD: &Self = &Self(0);
 }
 
