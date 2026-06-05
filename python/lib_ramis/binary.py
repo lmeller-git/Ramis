@@ -1,5 +1,5 @@
 from .lib_ramis import binary
 
-Binary = binary.Binary
+BinaryEvent = binary.BinaryEvent
 BinaryBFS = binary.BinaryBFS
 BinaryBFSStep = binary.BinaryBFSStep

@@ -2,9 +2,9 @@ import enum
 from typing import Generic, TypeVar
 from lib_ramis import CancelToken, PyState, GenericResult
 
-_BinaryStateT = TypeVar("_BinaryStateT", bound=PyState[Binary])
+_BinaryStateT = TypeVar("_BinaryStateT", bound=PyState[BinaryEvent])
 
-class Binary(enum.Enum):
+class BinaryEvent(enum.Enum):
     No = 0
     Yes = 1
 

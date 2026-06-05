@@ -23,7 +23,7 @@ use crate::{
 generate_static_event!(
     #[pyclass(from_py_object)]
     #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-    pub enum Binary {
+    pub enum BinaryEvent {
         No,
         Yes,
     }
@@ -33,7 +33,7 @@ pub struct BinaryTreeSearch;
 
 impl SearchDomain for BinaryTreeSearch {
     type Algorithm = PyAlgorithm;
-    type Event = Binary;
+    type Event = BinaryEvent;
     type Policy = GenericResultInterpretor;
     type State = PyStateWrapper;
 }

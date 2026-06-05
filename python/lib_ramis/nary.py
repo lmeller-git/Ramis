@@ -1,6 +1,4 @@
 from .lib_ramis import nary
 
 
-NAryEvent = nary.NAryEvent
-NAryBFS = nary.NAryBFS
-NAryStep = nary.NAryStep
+create_nary_scheduler = nary.create_nary_scheduler
