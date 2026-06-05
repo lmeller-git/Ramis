@@ -1,7 +1,6 @@
 from typing import override
 from . import CancelToken, GenericResult
 
-
 class Trace:
     def to_list(self) -> list[bool]: ...
     @override
@@ -9,10 +8,8 @@ class Trace:
     @override
     def __repr__(self) -> str: ...
 
-
 class TracedStep:
     def path(self) -> Trace: ...
-
 
 class TracedBFS:
     def __init__(self) -> None: ...

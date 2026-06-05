@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Generic, Self, TypeVar
 
 from . import binary as binary
 from . import traced as traced
 from . import nary as nary
+
+_EventT = TypeVar("_EventT")
 
 class CancelToken(ABC):
     def __init__(self) -> None: ...
@@ -12,19 +14,16 @@ class CancelToken(ABC):
     @abstractmethod
     def is_cancelled(self) -> bool: ...
 
-
-class PyState(ABC):
+class PyState(ABC, Generic[_EventT]):
     def __init__(self) -> None: ...
     @abstractmethod
-    def step(self, event: Any) -> PyState: ...
-
+    def step(self, event: _EventT) -> Self: ...
 
 class GenericResult:
     def __init__(self, r: int) -> None: ...
     def is_dead(self) -> bool: ...
     def is_accepted(self) -> bool: ...
     def raw_score(self) -> int: ...
-
 
 class GenericResultInterpretor:
     def __init__(self) -> None: ...

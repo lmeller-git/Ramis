@@ -1,9 +1,4 @@
-from .lib_ramis import (
-    CancelToken,
-    PyState,
-    GenericResult,
-    GenericResultInterpretor
-)
+from .lib_ramis import CancelToken, PyState, GenericResult, GenericResultInterpretor
 
 # Import the local python wrapper modules
 from . import binary
@@ -17,5 +12,5 @@ __all__ = [
     "GenericResultInterpretor",
     "binary",
     "traced",
-    "nary"
+    "nary",
 ]
