@@ -1,10 +1,12 @@
+//! test stubs fro integration tests
+
 use core::hint::black_box;
 
 use ramis_core::StaticEvent;
 use ramis_schedule::StepScheduler;
 
 use super::*;
-use crate::{oracle::MockOracleEvent, path::SimplePath};
+use crate::{oracle::GenericOracleEvent, path::VecTrace};
 
 // =========================================================================
 // 1. BASIC SEMANTICS TESTS
@@ -15,7 +17,12 @@ use crate::{oracle::MockOracleEvent, path::SimplePath};
 pub fn assert_infinite_without_feedback<S, E>()
 where
     E: StaticEvent + Clone,
-    S: Default + StepScheduler<SimplePath<E>, MockCancel, StateInterpretation = MockOracleEvent>,
+    S: Default
+        + StepScheduler<
+            VecTrace<E>,
+            AtomicCancellationToken,
+            StateInterpretation = GenericOracleEvent,
+        >,
 {
     let scheduler = S::default();
     const DEPTH_THRESHOLD: usize = 500;
@@ -23,7 +30,7 @@ where
     // Pull an arbitrary high number of paths. Without feedback pruning,
     // the frontier must continuously expand and never dry up.
     for i in 0..DEPTH_THRESHOLD {
-        let token = MockCancel::default();
+        let token = AtomicCancellationToken::default();
         let res = scheduler.next(token);
         assert!(
             res.is_ok(),
@@ -39,10 +46,15 @@ where
 pub fn assert_bounded_termination_with_feedback<S, E>(max_steps: usize)
 where
     E: StaticEvent + Clone,
-    S: Default + StepScheduler<SimplePath<E>, MockCancel, StateInterpretation = MockOracleEvent>,
+    S: Default
+        + StepScheduler<
+            VecTrace<E>,
+            AtomicCancellationToken,
+            StateInterpretation = GenericOracleEvent,
+        >,
 {
     let scheduler = S::default();
-    let token = MockCancel::default();
+    let token = AtomicCancellationToken::default();
     let mut loop_count = 0;
 
     // Loop until next returns an error signifying the frontier is completely exhausted
@@ -50,7 +62,7 @@ where
         loop_count += 1;
 
         // Explicitly prune EVERY single path as Dead to drain the tree
-        scheduler.put_result(step, MockOracleEvent::Dead);
+        scheduler.put_result(step, GenericOracleEvent::Dead);
 
         // in this particular case exactly E::VARIANTS.len() paths will be created. TODO
         assert!(
@@ -65,10 +77,15 @@ where
 pub fn assert_token_cancellation_propagation<S, E>()
 where
     E: StaticEvent + Clone,
-    S: Default + StepScheduler<SimplePath<E>, MockCancel, StateInterpretation = MockOracleEvent>,
+    S: Default
+        + StepScheduler<
+            VecTrace<E>,
+            AtomicCancellationToken,
+            StateInterpretation = GenericOracleEvent,
+        >,
 {
     let scheduler = S::default();
-    let token = MockCancel::default();
+    let token = AtomicCancellationToken::default();
 
     let step = scheduler.next(token.clone()).expect("Should fetch root");
 
@@ -86,10 +103,15 @@ where
 pub fn assert_notify_done_terminates_immediately<S, E>()
 where
     E: StaticEvent + Clone,
-    S: Default + StepScheduler<SimplePath<E>, MockCancel, StateInterpretation = MockOracleEvent>,
+    S: Default
+        + StepScheduler<
+            VecTrace<E>,
+            AtomicCancellationToken,
+            StateInterpretation = GenericOracleEvent,
+        >,
 {
     let scheduler = S::default();
-    let token = MockCancel::default();
+    let token = AtomicCancellationToken::default();
 
     let _step = scheduler.next(token.clone()).expect("Should fetch root");
 
@@ -103,12 +125,16 @@ where
     );
 }
 
+/// N workers concurrently get and put state from the scheduler
 pub fn mpmc_concurrent<S, E>(workers: usize)
 where
     E: StaticEvent + Clone,
     S: Default
-        + StepScheduler<SimplePath<E>, MockCancel, StateInterpretation = MockOracleEvent>
-        + Sync,
+        + StepScheduler<
+            VecTrace<E>,
+            AtomicCancellationToken,
+            StateInterpretation = GenericOracleEvent,
+        > + Sync,
 {
     let scheduler = S::default();
     #[cfg(any(shuttle, loom))]
@@ -122,7 +148,7 @@ where
         for _ in 0..workers {
             scope.spawn(|| {
                 loop {
-                    let token = MockCancel::default();
+                    let token = AtomicCancellationToken::default();
                     let Ok(item) = scheduler.next(token) else {
                         break;
                     };
@@ -136,7 +162,7 @@ where
 
                     black_box(&item);
 
-                    scheduler.put_result(item, MockOracleEvent::Alive(42));
+                    scheduler.put_result(item, GenericOracleEvent::Alive(42));
 
                     if old <= 1 {
                         break;
@@ -150,12 +176,16 @@ where
     assert!(current_count.load(ramis_core::sync::atomic::Ordering::Acquire) == 0);
 }
 
+/// N workers concurrently get and put state from the scheduler. Some branches are annotated as Dead.
 pub fn mpmc_concurrent_pruned<S, E>(workers: usize)
 where
     E: StaticEvent + Clone,
     S: Default
-        + StepScheduler<SimplePath<E>, MockCancel, StateInterpretation = MockOracleEvent>
-        + Sync,
+        + StepScheduler<
+            VecTrace<E>,
+            AtomicCancellationToken,
+            StateInterpretation = GenericOracleEvent,
+        > + Sync,
 {
     let scheduler = S::default();
     #[cfg(any(shuttle, loom))]
@@ -170,7 +200,7 @@ where
         for _ in 0..workers {
             scope.spawn(|| {
                 loop {
-                    let token = MockCancel::default();
+                    let token = AtomicCancellationToken::default();
                     let Ok(item) = scheduler.next(token) else {
                         break;
                     };
@@ -188,9 +218,9 @@ where
                         kill_this_counter.fetch_add(1, core::sync::atomic::Ordering::AcqRel);
 
                     let res = if kill_this.is_multiple_of(10) {
-                        MockOracleEvent::Dead
+                        GenericOracleEvent::Dead
                     } else {
-                        MockOracleEvent::Alive(42)
+                        GenericOracleEvent::Alive(42)
                     };
 
                     scheduler.put_result(item, res);

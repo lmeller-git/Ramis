@@ -1,12 +1,6 @@
 use pyo3::prelude::*;
 use ramis::schedule::BFS;
-use ramis_core::{
-    HasLevelStorage,
-    ScheduledStep,
-    SearchDomain,
-    StaticEvent,
-    generate_static_event,
-};
+use ramis_core::{ScheduledStep, SearchDomain, generate_static_event};
 use ramis_schedule::StepScheduler;
 
 use crate::{

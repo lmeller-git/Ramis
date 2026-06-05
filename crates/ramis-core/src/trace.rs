@@ -84,15 +84,21 @@ macro_rules! generate_static_event {
     (
         $(#[$attr:meta])*
         $vis:vis enum $name:ident {
-            $($variant:ident),+ $(,)?
+            $(
+                $(#[$v_attr:meta])*
+                $variant:ident
+            ),+ $(,)?
         }
     ) => {
         $(#[$attr])*
         $vis enum $name {
-            $($variant),+
+            $(
+                $(#[$v_attr])*
+                $variant
+            ),+
         }
 
-        impl HasLevelStorage for $name {
+        impl $crate::HasLevelStorage for $name {
             type LevelStorage<T> = [T; [ $( stringify!($variant) ),+ ].len() ];
 
             #[inline]
@@ -104,7 +110,7 @@ macro_rules! generate_static_event {
             }
         }
 
-        impl StaticEvent for $name {
+        impl $crate::StaticEvent for $name {
             const VARIANTS: &Self::LevelStorage<Self> = &[
                 $( Self::$variant ),+
             ];

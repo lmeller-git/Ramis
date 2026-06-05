@@ -21,6 +21,16 @@ pub mod traits {
     pub use ramis_schedule::StepScheduler;
 }
 
+pub mod components {
+    //! Useful prebuilt components for expressing algorihtm run with `Ramis`
+    pub use ramis_mock::{
+        AtomicCancellationToken,
+        event::*,
+        oracle::{GenericOracleEvent, HeuristicPolicy},
+        path::{TraceRecorder, TracedSearcher, VecTrace},
+    };
+}
+
 pub mod schedule {
     //! Module containing schedulers. All schedulers in this module are more convenient newtypes or reexports from `ramis::core::schedule`.
     use ramis_core::{Cancellable, SearchDomain, SelectionPolicy, StaticEvent};

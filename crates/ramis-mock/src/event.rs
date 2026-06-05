@@ -1,38 +1,36 @@
-use ramis_core::{Algorithm, EventReplay, HasLevelStorage, StaticEvent, generate_static_event};
+//! Contains useful branching factors
 
-use crate::path::SimplePath;
+use ramis_core::generate_static_event;
 
-pub struct PushAlgorithm;
-
-impl<E: StaticEvent + Clone> Algorithm<SimplePath<E>, E> for PushAlgorithm {
-    type Error = ();
-
-    fn step(state: &mut SimplePath<E>, event: E) -> Result<(), Self::Error> {
-        state.push(event);
-        Ok(())
+generate_static_event! {
+    /// A Tree with a branching factor of 1, i.e. a line
+    #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+    pub enum UnitBranch {
+        /// The single branchpoint
+        Value,
     }
 }
 
 generate_static_event! {
+    /// A BinaryTree
     #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-    pub enum Flat {
-        V,
+    pub enum BinaryBranch {
+        /// One branch in the BinaryTree
+        Left,
+        /// The other branch in the BinaryTree
+        Right,
     }
 }
 
 generate_static_event! {
+    /// A Ternary tree
     #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-    pub enum Boolean {
-        V1,
-        V2,
-    }
-}
-
-generate_static_event! {
-    #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-    pub enum Triplet {
-        V1,
-        V2,
-        V3
+    pub enum TernaryBranch {
+        /// One branch in the Ternary Tree
+        Left,
+        /// Another branch in the Ternary Tree
+        Middle,
+        /// Another branch in the Ternary Tree
+        Right
     }
 }

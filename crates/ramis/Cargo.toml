@@ -9,14 +9,12 @@ repository.workspace = true
 
 [features]
 default = ["std"]
-std = ["ramis-core/std", "ramis-schedule/std"]
+std = ["ramis-core/std", "ramis-schedule/std", "ramis-mock/std"]
 
 [dependencies]
 ramis-core = { path = "../ramis-core", default-features = false }
 ramis-schedule = { path = "../ramis-schedule", default-features = false }
-
-[dev-dependencies]
-ramis-mock = { workspace = true }
+ramis-mock = { path = "../ramis-mock", default-features = false }
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7.2"

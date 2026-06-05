@@ -4,7 +4,8 @@
 ![no_std Test](https://github.com/lmeller-git/Ramis/actions/workflows/nostd.yml/badge.svg?branch=main)
 
 # Ramis
-### *Concurrent tree search, branch by branch.*
+
+> Concurrent tree search, branch by branch.
 
 A framework and implementation for concurrently running a class of tree search algorithms.
 Ramis decouples the specific algorithm from its concurrent state exploration logic, allowing
