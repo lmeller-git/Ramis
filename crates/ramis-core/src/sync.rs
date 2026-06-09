@@ -1,6 +1,12 @@
 //! crate internal sync plumbing for testing and no_std support
 
-#![allow(dead_code, unused_imports, clippy::disallowed_modules, missing_docs)]
+#![allow(
+    dead_code,
+    unused_imports,
+    unknown_lints,
+    clippy::disallowed_modules,
+    missing_docs
+)]
 
 #[cfg(all(not(loom), not(shuttle)))]
 pub use core_::*;
