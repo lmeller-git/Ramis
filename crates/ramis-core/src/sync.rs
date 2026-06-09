@@ -1,19 +1,22 @@
 //! crate internal sync plumbing for testing and no_std support
 
-#![allow(dead_code, unused_imports, clippy::disallowed_modules)]
+#![allow(dead_code, unused_imports, clippy::disallowed_modules, missing_docs)]
 
-#[cfg(any(not(test), all(not(loom), not(shuttle))))]
+#[cfg(all(not(loom), not(shuttle)))]
 pub use core_::*;
-#[cfg(all(loom, test))]
+#[cfg(loom)]
 pub use loom_::*;
-#[cfg(all(shuttle, test))]
+#[cfg(shuttle)]
 pub use shuttle_::*;
 
-#[cfg(all(shuttle, test))]
+#[cfg(shuttle)]
 mod shuttle_ {
     #[allow(unused_imports)]
     pub use shuttle::hint;
-    pub use shuttle::{sync::atomic, thread};
+    pub use shuttle::{
+        sync::{Arc, Weak, atomic},
+        thread,
+    };
 
     pub mod cell {
         #[derive(Debug)]
@@ -42,17 +45,17 @@ mod shuttle_ {
     }
 }
 
-#[cfg(all(loom, test))]
+#[cfg(loom)]
 mod loom_ {
     pub use loom::{
         cell,
         hint,
-        sync::{Arc, atomic},
+        sync::{Arc, Weak, atomic},
         thread,
     };
 }
 
-#[cfg(any(not(test), all(not(loom), not(shuttle))))]
+#[cfg(all(not(loom), not(shuttle)))]
 mod core_ {
     pub mod cell {
         //! UnsafeCell

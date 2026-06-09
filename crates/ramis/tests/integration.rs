@@ -1,4 +1,4 @@
-#[cfg(any(test, feature = "std"))]
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use core::marker::PhantomData;
 
