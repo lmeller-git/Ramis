@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 #[cfg(all(test, feature = "std"))]
 mod tests {
     use core::marker::PhantomData;
