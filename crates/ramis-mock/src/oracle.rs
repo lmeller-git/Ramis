@@ -52,12 +52,4 @@ impl<T: Ord> SelectionPolicy for HeuristicPolicy<T> {
     fn compare(a: &Self::OracleEvent, b: &Self::OracleEvent) -> Ordering {
         a.cmp(b)
     }
-
-    fn may_reject(s: &Self::OracleEvent) -> bool {
-        *s == GenericOracleEvent::Dead
-    }
-
-    fn may_accept(s: &Self::OracleEvent) -> bool {
-        *s == GenericOracleEvent::Accept
-    }
 }

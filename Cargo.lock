@@ -82,9 +82,9 @@ dependencies = [
 
 [[package]]
 name = "bitflags"
-version = "2.12.1"
+version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84d7ced0ae9557296835c32bf1b1e02b44c746701f898460fb000d7eaa84f00a"
+checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 
 [[package]]
 name = "bitmaps"
@@ -587,9 +587,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.31"
+version = "0.4.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "113b30b4cd05f7c06868fdb2854f66a7b9fece9a48425351cd532e810d74024f"
+checksum = "953f07c43838f8e6f9758cab68bf5bed85465e7587ebe0b823f1bcd81978ad3a"
 
 [[package]]
 name = "loom"
@@ -643,6 +643,17 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "nblf-queue"
+version = "0.1.0"
+source = "git+https://github.com/lmeller-git/nblf-queue.git#cecb4358867444b61e72346baf21ebcbdd7a5126"
+dependencies = [
+ "crossbeam-utils",
+ "loom",
+ "portable-atomic",
+ "shuttle 0.8.1",
 ]
 
 [[package]]
@@ -885,7 +896,7 @@ dependencies = [
  "ramis-core",
  "ramis-mock",
  "ramis-schedule",
- "shuttle",
+ "shuttle 0.9.1",
 ]
 
 [[package]]
@@ -895,7 +906,7 @@ dependencies = [
  "lock_api",
  "loom",
  "portable-atomic",
- "shuttle",
+ "shuttle 0.9.1",
  "spin",
 ]
 
@@ -906,7 +917,7 @@ dependencies = [
  "loom",
  "ramis-core",
  "ramis-schedule",
- "shuttle",
+ "shuttle 0.9.1",
 ]
 
 [[package]]
@@ -914,6 +925,7 @@ name = "ramis-schedule"
 version = "0.1.0"
 dependencies = [
  "lock_api",
+ "nblf-queue",
  "ramis-core",
  "smallvec",
 ]
@@ -1155,6 +1167,26 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "shuttle"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ab17edba38d63047f46780cf7360acf7467fec2c048928689a5c1dd1c2b4e31"
+dependencies = [
+ "assoc",
+ "bitvec",
+ "cfg-if",
+ "generator",
+ "hex",
+ "owo-colors",
+ "rand 0.8.6",
+ "rand_core 0.6.4",
+ "rand_pcg",
+ "scoped-tls",
+ "smallvec",
+ "tracing",
+]
 
 [[package]]
 name = "shuttle"

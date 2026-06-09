@@ -5,6 +5,7 @@ use core::{hash::Hash, iter::once, marker::PhantomData, ops::ControlFlow};
 
 use ramis_core::{
     Algorithm,
+    BranchDirective,
     Cancellable,
     EventReplay,
     HasLevelStorage,
@@ -64,14 +65,6 @@ impl<E: StaticEvent + Clone + Eq> EventReplay for RelativePath<E> {
     }
 }
 
-/// Can a branch advance, or must we wait on it
-pub enum Advanceable {
-    /// The node associated with this branch can adavance irrespecitve of all other branches
-    Force,
-    /// The ndoe can advance if all other branches in this node can also advance
-    May,
-}
-
 /// A node in the schedulers tree representation of the algorithm
 pub struct TreeNode<E, C, S>
 where
@@ -120,26 +113,28 @@ where
     /// can this node advance into one of it sbranches?
     pub fn may_advcance<F>(&self, f: F) -> bool
     where
-        F: Fn(&S) -> Advanceable,
+        F: Fn(&S) -> BranchDirective,
     {
-        let mut may_advance = true;
+        let mut may_advance = BranchDirective::Proceed;
+
         for c in self.children.lock().as_ref().iter() {
             match c {
-                None => may_advance = false,
-                Some(c) if c.result.lock().is_none() => may_advance = false,
+                None => may_advance = may_advance.and_across(&BranchDirective::Unspecified),
+                Some(c) if c.result.lock().is_none() => {
+                    may_advance = may_advance.and_across(&BranchDirective::Unspecified)
+                }
                 Some(c) => {
                     let r = c.result.lock();
                     if let Some(r) = r.as_ref() {
-                        match f(r) {
-                            Advanceable::May => {}
-                            Advanceable::Force => return true,
-                        }
+                        may_advance = may_advance.and_across(&f(r));
+                    } else {
+                        unreachable!()
                     }
                 }
             }
         }
 
-        may_advance
+        may_advance.is_ready()
     }
 }
 
@@ -168,29 +163,31 @@ where
     C: Cancellable,
     E: HasLevelStorage,
 {
-    /// can the root advance into on eof its children?
+    /// can the root advance into on of its children?
     pub fn may_advcance<F>(&self, f: F) -> bool
     where
-        F: Fn(&S) -> Advanceable,
+        F: Fn(&S) -> BranchDirective,
     {
-        let mut may_advance = true;
+        let mut may_advance = BranchDirective::Proceed;
+
         for c in self.children.lock().as_ref().iter() {
             match c {
-                None => may_advance = false,
-                Some(c) if c.result.lock().is_none() => may_advance = false,
+                None => may_advance = may_advance.and_across(&BranchDirective::Unspecified),
+                Some(c) if c.result.lock().is_none() => {
+                    may_advance = may_advance.and_across(&BranchDirective::Unspecified)
+                }
                 Some(c) => {
                     let r = c.result.lock();
                     if let Some(r) = r.as_ref() {
-                        match f(r) {
-                            Advanceable::May => {}
-                            Advanceable::Force => return true,
-                        }
+                        may_advance = may_advance.and_across(&f(r));
+                    } else {
+                        unreachable!()
                     }
                 }
             }
         }
 
-        may_advance
+        may_advance.is_ready()
     }
 }
 
@@ -299,7 +296,7 @@ where
                     .result
                     .lock()
                     .as_ref()
-                    .is_some_and(P::may_reject)
+                    .is_some_and(|r| matches!(P::branch_directive(r), BranchDirective::Prune))
                     || parent_node_strong.generation < current_gen + 1
                 {
                     continue;
@@ -409,7 +406,12 @@ where
 
             *node.result.lock() = Some(event);
 
-            if node.result.lock().as_ref().is_some_and(P::may_reject) {
+            if node
+                .result
+                .lock()
+                .as_ref()
+                .is_some_and(|r| matches!(P::branch_directive(r), BranchDirective::Prune))
+            {
                 // reap all children
                 // Note that it is possible for a child to be correct. Since we do not search for global optimum, this does not matter. Any path to q-minimality is fine.
 
@@ -429,15 +431,7 @@ where
             // reap all non-children and set as root if our generation == current_generation
             // We check if all siblings of node are done. We know that nodes siblings are roots chidlren, since our generation is root_gen + 1
 
-            if item_gen == current_generation + 1
-                && tasks.may_advcance(|r| {
-                    if P::may_accept(r) {
-                        Advanceable::Force
-                    } else {
-                        Advanceable::May
-                    }
-                })
-            {
+            if item_gen == current_generation + 1 && tasks.may_advcance(P::branch_directive) {
                 // we are now the new root.
                 // walk our subtree until we find no new suitable root
                 // finally update the tree root to drop all tasks not on our subtree and extend root path
@@ -449,12 +443,14 @@ where
                         let res_lock = child.result.lock();
                         let Some(res) = res_lock.as_ref() else { continue; };
 
-                        if P::may_reject(res) {
-                            continue;
-                        }
+                        let directive = P::branch_directive(res);
 
-                        if P::may_accept(res) {
-                            return Some((variant.clone(), child.clone()));
+                        match directive {
+                            BranchDirective::Prune => continue,
+                            BranchDirective::Hold => continue,
+                            BranchDirective::Unspecified => continue,
+                            BranchDirective::Force => return Some((variant.clone(), child.clone())),
+                            BranchDirective::Proceed => {},
                         }
 
                         if best.as_ref().is_none_or(|(_, best): &(E, Arc<TreeNode<E, C, S>>)| {
@@ -474,13 +470,7 @@ where
                 let mut acc = alloc::vec![variant];
 
                 TreeNode::walk_subtree(lowest_node.clone(), &mut |node| {
-                    if !node.may_advcance(|r| {
-                        if P::may_accept(r) {
-                            Advanceable::Force
-                        } else {
-                            Advanceable::May
-                        }
-                    }) {
+                    if !node.may_advcance(P::branch_directive) {
                         return ControlFlow::Break(());
                     }
                     if let Some((variant, next_node)) = find_best(node.children.lock().as_ref()) {

@@ -30,70 +30,76 @@ mod tests {
         type State = VecTrace<E>;
     }
 
-    #[test]
-    fn test_infinite_stream_bfs() {
-        assert_infinite_without_feedback::<
-            BFS<SimplDomain<UnitBranch>, AtomicCancellationToken>,
-            UnitBranch,
-        >();
-    }
+    #[cfg(not(shuttle))]
+    mod seq {
+        use super::*;
+        #[test]
+        fn test_infinite_stream_bfs() {
+            assert_infinite_without_feedback::<
+                BFS<SimplDomain<UnitBranch>, AtomicCancellationToken>,
+                UnitBranch,
+            >();
+        }
 
-    #[test]
-    fn test_termination_bfs() {
-        assert_bounded_termination_with_feedback::<
-            BFS<SimplDomain<UnitBranch>, AtomicCancellationToken>,
-            UnitBranch,
-        >(1);
-        assert_bounded_termination_with_feedback::<
-            BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>,
-            TernaryBranch,
-        >(3);
-    }
+        #[test]
+        fn test_termination_bfs() {
+            assert_bounded_termination_with_feedback::<
+                BFS<SimplDomain<UnitBranch>, AtomicCancellationToken>,
+                UnitBranch,
+            >(1);
+            assert_bounded_termination_with_feedback::<
+                BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>,
+                TernaryBranch,
+            >(3);
+        }
 
-    #[test]
-    fn test_cancel_bfs() {
-        assert_token_cancellation_propagation::<
-            BFS<SimplDomain<UnitBranch>, AtomicCancellationToken>,
-            UnitBranch,
-        >();
-    }
+        #[test]
+        fn test_cancel_bfs() {
+            assert_token_cancellation_propagation::<
+                BFS<SimplDomain<UnitBranch>, AtomicCancellationToken>,
+                UnitBranch,
+            >();
+        }
 
-    #[test]
-    fn test_kill_bfs() {
-        assert_notify_done_terminates_immediately::<
-            BFS<SimplDomain<UnitBranch>, AtomicCancellationToken>,
-            UnitBranch,
-        >();
-    }
+        #[test]
+        fn test_kill_bfs() {
+            assert_notify_done_terminates_immediately::<
+                BFS<SimplDomain<UnitBranch>, AtomicCancellationToken>,
+                UnitBranch,
+            >();
+        }
 
-    #[test]
-    fn test_get_put_sequential_bfs() {
-        mpmc_concurrent::<BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>, TernaryBranch>(
-            1,
-        );
-    }
+        #[test]
+        fn test_get_put_sequential_bfs() {
+            mpmc_concurrent::<
+                BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>,
+                TernaryBranch,
+            >(1);
+        }
 
-    #[test]
-    fn test_get_put_concurrent_bfs() {
-        mpmc_concurrent::<BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>, TernaryBranch>(
-            16,
-        );
-    }
+        #[test]
+        fn test_get_put_concurrent_bfs() {
+            mpmc_concurrent::<
+                BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>,
+                TernaryBranch,
+            >(16);
+        }
 
-    #[test]
-    fn test_get_put_prune_sequential_bfs() {
-        mpmc_concurrent_pruned::<
-            BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>,
-            TernaryBranch,
-        >(1);
-    }
+        #[test]
+        fn test_get_put_prune_sequential_bfs() {
+            mpmc_concurrent_pruned::<
+                BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>,
+                TernaryBranch,
+            >(1);
+        }
 
-    #[test]
-    fn test_get_put_prune_concurrent_bfs() {
-        mpmc_concurrent_pruned::<
-            BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>,
-            TernaryBranch,
-        >(16);
+        #[test]
+        fn test_get_put_prune_concurrent_bfs() {
+            mpmc_concurrent_pruned::<
+                BFS<SimplDomain<TernaryBranch>, AtomicCancellationToken>,
+                TernaryBranch,
+            >(16);
+        }
     }
 
     #[cfg(shuttle)]

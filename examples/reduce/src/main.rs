@@ -15,7 +15,7 @@ impl SearchDomain for ReductionAlgorithm {
 
 #[tokio::main]
 async fn main() {
-    let num_workers = 8;
+    let num_workers = 4;
     let query_len = 1000;
 
     let mut base_query = vec![0u16; query_len];

@@ -67,14 +67,83 @@ pub trait SelectionPolicy {
     /// the scheduler prefers the greatest event according to this comparison
     fn compare(a: &Self::OracleEvent, b: &Self::OracleEvent) -> Ordering;
 
-    /// the scheduler may prune this branch
-    fn may_reject(s: &Self::OracleEvent) -> bool {
-        s == Self::OracleEvent::DEAD
+    /// determines how wether the scheduler should advance into this branch (or its siblings)
+    fn branch_directive(s: &Self::OracleEvent) -> BranchDirective {
+        match s {
+            _ if s == <Self::OracleEvent as OracleEvent>::DEAD => BranchDirective::Prune,
+            _ if <Self::OracleEvent as OracleEvent>::ACCEPTED.is_some_and(|acc| acc == s) => {
+                BranchDirective::Force
+            }
+            _ => BranchDirective::Proceed,
+        }
+    }
+}
+
+/// Determines how the scheduler should treat a branch based on its oracle evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BranchDirective {
+    /// Discard this branch and prune the subtree.
+    Prune,
+    /// The parent node should not advance into any of its children, unless forced to do so
+    Hold,
+    /// The parent node may advance into any of its `BranchDirective::Proceed` children, unless specified otherwise by a sibling
+    Proceed,
+    /// The parent node should advance into this branch independently of sibling state
+    Force,
+    /// It is not specified what happens to this node. The scheduler may decide
+    Unspecified,
+}
+
+impl BranchDirective {
+    /// combines two BranchDirective's for one branch
+    pub fn and_self(self, other: &Self) -> Self {
+        match (self, other) {
+            (Self::Prune, _) => Self::Prune,
+            (_, Self::Prune) => Self::Prune,
+
+            (Self::Force, _) => Self::Force,
+            (_, Self::Force) => Self::Force,
+
+            (Self::Hold, _) => Self::Hold,
+            (_, Self::Hold) => Self::Hold,
+
+            (Self::Proceed, Self::Proceed) => Self::Proceed,
+
+            (Self::Unspecified, _) => *other,
+            (_, Self::Unspecified) => self,
+        }
     }
 
-    /// the scheduler should/may accept this branch
-    fn may_accept(s: &Self::OracleEvent) -> bool {
-        Self::OracleEvent::ACCEPTED.is_some_and(|ev| ev == s)
+    /// combines two BranchDirective's for two sibling branches. This indicates the status of the parent of the combined siblings
+    pub fn and_across(self, other: &Self) -> Self {
+        match (self, other) {
+            (Self::Prune, Self::Prune) => Self::Prune,
+
+            (Self::Force, _) => Self::Force,
+            (_, Self::Force) => Self::Force,
+
+            (Self::Unspecified, _) => Self::Unspecified,
+            (_, Self::Unspecified) => Self::Unspecified,
+
+            (Self::Prune, _) => Self::Prune,
+            (_, Self::Prune) => Self::Prune,
+
+            (Self::Hold, _) => Self::Hold,
+            (_, Self::Hold) => Self::Hold,
+
+            (Self::Proceed, Self::Proceed) => Self::Proceed,
+        }
+    }
+
+    /// Determines wether this state is ready for advancement
+    pub fn is_ready(&self) -> bool {
+        match self {
+            Self::Force => true,
+            Self::Proceed => true,
+            Self::Prune => true,
+            Self::Hold => false,
+            Self::Unspecified => false,
+        }
     }
 }
 

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-use dry::MockPath;
+use dry::{MockEvent, MockPath};
 use ramis::traits::{Cancellable, OracleEvent, SelectionPolicy, StepScheduler};
 use tokio_util::sync::CancellationToken;
 
@@ -38,10 +38,11 @@ impl Cancellable for MockCancelToken {
 pub enum MockInterpretationResult {
     Dead,
     Valid { length: usize },
+    Good,
 }
 
 impl OracleEvent for MockInterpretationResult {
-    const ACCEPTED: Option<&Self> = None;
+    const ACCEPTED: Option<&Self> = Some(&Self::Good);
     const DEAD: &Self = &Self::Dead;
 }
 
@@ -52,6 +53,8 @@ impl SelectionPolicy for MockResultInterpretor {
 
     fn compare(a: &MockInterpretationResult, b: &MockInterpretationResult) -> std::cmp::Ordering {
         match (a, b) {
+            (MockInterpretationResult::Good, _) => std::cmp::Ordering::Greater,
+            (_, MockInterpretationResult::Good) => std::cmp::Ordering::Less,
             (
                 MockInterpretationResult::Valid { length: l1 },
                 MockInterpretationResult::Valid { length: l2 },
@@ -66,14 +69,6 @@ impl SelectionPolicy for MockResultInterpretor {
                 std::cmp::Ordering::Less
             }
         }
-    }
-
-    fn may_reject(s: &MockInterpretationResult) -> bool {
-        matches!(s, MockInterpretationResult::Dead)
-    }
-
-    fn may_accept(_s: &MockInterpretationResult) -> bool {
-        false
     }
 }
 
@@ -106,7 +101,7 @@ fn do_algo(path: &MockPath, mut base_query: Vec<u16>) -> MockInterpretationResul
     }
 
     algo(path, &mut base_query);
-    oracle(&base_query)
+    oracle(&base_query, path.p.last().unwrap())
 }
 
 pub async fn run_worker<S>(scheduler: Arc<S>, base_query: Vec<u16>)
@@ -143,7 +138,7 @@ where
     }
 }
 
-pub fn oracle(query: &[u16]) -> MockInterpretationResult {
+pub fn oracle(query: &[u16], decision: &MockEvent) -> MockInterpretationResult {
     let mut x: i32 = 0;
     for _ in 0..5_000_000 {
         x = x.wrapping_add(1);
@@ -156,6 +151,11 @@ pub fn oracle(query: &[u16]) -> MockInterpretationResult {
         if min.len() > query.len() || min.is_empty() {
             *min = query.to_vec();
         }
+
+        if decision.0 {
+            return MockInterpretationResult::Good;
+        }
+
         return MockInterpretationResult::Valid {
             length: query.len(),
         };

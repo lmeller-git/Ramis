@@ -139,14 +139,6 @@ impl SelectionPolicy for GenericResultInterpretor {
     fn compare(a: &Self::OracleEvent, b: &Self::OracleEvent) -> std::cmp::Ordering {
         a.cmp(b)
     }
-
-    fn may_reject(s: &Self::OracleEvent) -> bool {
-        s == Self::OracleEvent::DEAD
-    }
-
-    fn may_accept(s: &Self::OracleEvent) -> bool {
-        Self::OracleEvent::ACCEPTED.is_some_and(|accepted| s == accepted)
-    }
 }
 
 #[pymodule]

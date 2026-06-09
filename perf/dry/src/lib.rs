@@ -73,14 +73,6 @@ impl SelectionPolicy for BooleanAcceptor {
     fn compare(a: &MockInterpretation, b: &MockInterpretation) -> std::cmp::Ordering {
         a.cmp(b)
     }
-
-    fn may_reject(s: &MockInterpretation) -> bool {
-        !s.0
-    }
-
-    fn may_accept(s: &MockInterpretation) -> bool {
-        s.0
-    }
 }
 
 #[derive(Clone, Debug, Default)]

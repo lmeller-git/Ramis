@@ -1,0 +1,5 @@
+disallowed-modules = [
+    "std::sync",
+    "core::sync",
+    "alloc::sync",
+]
