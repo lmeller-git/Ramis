@@ -8,10 +8,9 @@ repository.workspace = true
 
 [features]
 default = ["std"]
-std = ["ramis-core/std", "nblf-queue/std"]
+std = ["ramis-core/std"]
 
 [dependencies]
 ramis-core = { path = "../ramis-core", default-features = false }
-nblf-queue = { git = "https://github.com/lmeller-git/nblf-queue.git", features = ["alloc", "atomic-fallback"] }
 smallvec = "1.15.1"
 lock_api = { workspace = true }
