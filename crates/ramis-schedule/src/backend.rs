@@ -1,6 +1,6 @@
 //! Raw task queues used in schedulers
 
-use std::collections::VecDeque;
+use alloc::collections::VecDeque;
 
 use ramis_core::{SyncQueue, sync::Mutex};
 
