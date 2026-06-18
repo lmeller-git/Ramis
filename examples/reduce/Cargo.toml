@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-ramis = { workspace = true }
+ramis = { path = "../../crates/ramis", features = ["bounded"] }
 im = "15.1.0"
 dry = { path = "../../perf/dry" }
 tokio = { version = "1.52.3", features = ["full"] }

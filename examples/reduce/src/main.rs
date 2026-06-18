@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Instant};
 
 use dry::{MockEvent, MockPath, PushAlgorithm};
-use ramis::{schedule::BFS, traits::SearchDomain};
+use ramis::{schedule::BoundedBFS, traits::SearchDomain};
 use reduce::*;
 
 struct ReductionAlgorithm;
@@ -45,7 +45,8 @@ async fn main() {
 
     let start_time = Instant::now();
     let mut handles = Vec::new();
-    let scheduler: Arc<BFS<ReductionAlgorithm, MockCancelToken>> = Arc::new(BFS::default());
+    let scheduler: Arc<BoundedBFS<ReductionAlgorithm, MockCancelToken>> =
+        Arc::new(BoundedBFS::new(Default::default(), 256));
 
     for _ in 0..num_workers {
         let sched_clone = scheduler.clone();
