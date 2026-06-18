@@ -10,6 +10,7 @@ repository.workspace = true
 [features]
 default = ["std"]
 std = ["ramis-core/std", "ramis-schedule/std", "ramis-mock/std"]
+bounded = ["ramis-schedule/bounded"]
 
 [dependencies]
 ramis-core = { path = "../ramis-core", default-features = false }

@@ -17,7 +17,10 @@ pub mod path;
 #[cfg(any(test, feature = "std"))]
 pub mod test_impls;
 
-use ramis_core::Cancellable;
+#[cfg(feature = "std")]
+use std::time::Duration;
+
+use ramis_core::{BackOff, Cancellable};
 
 /// A CancellationToken backed by an AtomicBool. Must be polled.
 #[derive(Debug, Clone, Default)]
@@ -34,5 +37,38 @@ impl Cancellable for AtomicCancellationToken {
     fn is_cancelled(&self) -> bool {
         self.is_cancelled
             .load(ramis_core::sync::atomic::Ordering::Acquire)
+    }
+}
+
+/// A BackOff stragety that does nothing
+pub struct NoBackOff;
+
+impl BackOff for NoBackOff {
+    const INIT: Self = Self;
+
+    fn backoff(&mut self) {}
+
+    fn reset(&mut self) {}
+}
+
+/// A Backoff that waits for an exponentially increasing time
+pub struct Exponential(u64);
+
+impl BackOff for Exponential {
+    const INIT: Self = Self(1);
+
+    fn backoff(&mut self) {
+        #[cfg(feature = "std")]
+        std::thread::sleep(Duration::from_micros(self.0));
+        #[cfg(not(feature = "std"))]
+        for _ in 0..self.0 {
+            core::hint::spin_loop();
+        }
+
+        self.0 = (self.0 * 2).min(1024);
+    }
+
+    fn reset(&mut self) {
+        self.0 = 1
     }
 }

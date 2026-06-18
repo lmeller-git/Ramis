@@ -1,15 +1,9 @@
 use std::{hint::black_box, sync::Arc, thread};
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use dry::{
-    BooleanAcceptor,
-    MockCancelToken,
-    MockEvent,
-    MockInterpretation,
-    MockPath,
-    PushAlgorithm,
-};
-use ramis_schedule::{BFScheduler, StepScheduler};
+use dry::{MockCancelToken, MockDomain, MockInterpretation, MockPath};
+use ramis::schedule::BFS;
+use ramis_schedule::StepScheduler;
 
 // benchmarks llm generated
 
@@ -26,16 +20,7 @@ fn bench_scheduler_throughput(c: &mut Criterion) {
 
     group.bench_function("sequential_1_worker", |b| {
         b.iter_with_setup(
-            || {
-                Arc::new(BFScheduler::<
-                    MockPath,
-                    MockEvent,
-                    MockCancelToken,
-                    MockInterpretation,
-                    BooleanAcceptor,
-                    PushAlgorithm,
-                >::default())
-            },
+            || Arc::new(BFS::<MockDomain, MockCancelToken>::default()),
             |scheduler| {
                 for _ in 0..operations_per_iter {
                     let token = MockCancelToken::new();
@@ -54,16 +39,7 @@ fn bench_scheduler_throughput(c: &mut Criterion) {
 
     group.bench_function("parallel_5_workers", |b| {
         b.iter_with_setup(
-            || {
-                Arc::new(BFScheduler::<
-                    MockPath,
-                    MockEvent,
-                    MockCancelToken,
-                    MockInterpretation,
-                    BooleanAcceptor,
-                    PushAlgorithm,
-                >::default())
-            },
+            || Arc::new(BFS::<MockDomain, MockCancelToken>::default()),
             |scheduler| {
                 let num_workers = 5;
 

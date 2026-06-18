@@ -10,9 +10,19 @@ use ramis_core::{
     EventReplay,
     HasLevelStorage,
     OracleEvent,
+    SearchDomain,
     SelectionPolicy,
     StaticEvent,
 };
+
+pub struct MockDomain;
+
+impl SearchDomain for MockDomain {
+    type Algorithm = PushAlgorithm;
+    type Event = MockEvent;
+    type Policy = BooleanAcceptor;
+    type State = MockPath;
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct MockPath {

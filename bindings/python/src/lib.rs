@@ -3,6 +3,7 @@ use pyo3::{
     types::{PyDict, PyTuple},
 };
 use ramis_core::{Algorithm, Cancellable, OracleEvent, SelectionPolicy, sync::Arc};
+use ramis_schedule::StepError;
 
 use crate::{
     binary::{BinaryBFS, BinaryBFSStep, BinaryEvent},
@@ -44,6 +45,19 @@ impl Cancellable for PyCancelToken {
                 .extract(py)
                 .unwrap()
         })
+    }
+}
+
+// TODO py next should return Result<item, PyStepError> instead of Option<item>
+
+#[allow(dead_code)]
+#[pyclass(from_py_object)]
+#[derive(Clone)]
+pub struct PyStepError(StepError<PyCancelToken>);
+
+impl From<StepError<PyCancelToken>> for PyStepError {
+    fn from(value: StepError<PyCancelToken>) -> Self {
+        Self(value)
     }
 }
 

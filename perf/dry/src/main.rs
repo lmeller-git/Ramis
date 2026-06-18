@@ -8,9 +8,9 @@ use std::{
     time::Instant,
 };
 
-use dry::{BooleanAcceptor, MockCancelToken, MockInterpretation, MockPath, PushAlgorithm};
-use ramis_schedule::{BFScheduler, StepScheduler};
-
+use dry::{MockCancelToken, MockDomain, MockInterpretation, MockPath};
+use ramis::schedule::BFS;
+use ramis_schedule::StepScheduler;
 // benchmarks llm generated
 
 #[cfg(feature = "dhat-heap")]
@@ -34,16 +34,7 @@ fn main() {
 }
 
 fn run_stress_test(num_workers: usize, total_queries: usize) {
-    let scheduler: Arc<
-        BFScheduler<
-            MockPath,
-            dry::MockEvent,
-            MockCancelToken,
-            MockInterpretation,
-            BooleanAcceptor,
-            PushAlgorithm,
-        >,
-    > = Arc::new(BFScheduler::default());
+    let scheduler: Arc<BFS<MockDomain, MockCancelToken>> = Arc::new(BFS::default());
     let global_counter = Arc::new(AtomicUsize::new(0));
 
     let now = Instant::now();

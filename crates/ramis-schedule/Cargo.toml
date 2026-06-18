@@ -8,9 +8,11 @@ repository.workspace = true
 
 [features]
 default = ["std"]
-std = ["ramis-core/std"]
+std = ["ramis-core/std", "nblf-queue?/std"]
+bounded = ["nblf-queue"]
 
 [dependencies]
 ramis-core = { path = "../ramis-core", default-features = false }
 smallvec = "1.15.1"
 lock_api = { workspace = true }
+nblf-queue = { version = "0.1.0", features = ["alloc"], optional = true }

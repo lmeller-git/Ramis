@@ -33,25 +33,16 @@ pub mod components {
 
 pub mod schedule {
     //! Module containing schedulers. All schedulers in this module are more convenient newtypes or reexports from `ramis::core::schedule`.
-    use ramis_core::{Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
-    use ramis_schedule::{BFScheduler, StepScheduler};
+    use ramis_core::{BackOff, Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
+    use ramis_mock::NoBackOff;
+    use ramis_schedule::{BFScheduler, StepError, StepScheduler, schedule::BFS as RawBFS};
 
-    #[allow(type_alias_bounds)]
-    type RawBFS<D: SearchDomain, C: Cancellable> = BFScheduler<
-        D::State,
-        D::Event,
-        C,
-        <D::Policy as SelectionPolicy>::OracleEvent,
-        D::Policy,
-        D::Algorithm,
-    >;
-
-    /// A Concurrent Breath First Search Scheduler
-    pub struct BFS<D: SearchDomain, C: Cancellable> {
-        inner: RawBFS<D, C>,
+    /// A Concurrent Breadth First Search Scheduler with unbounded capacity
+    pub struct BFS<D: SearchDomain, C: Cancellable, B: BackOff = NoBackOff> {
+        inner: RawBFS<D, C, B>,
     }
 
-    impl<D: SearchDomain, C> Default for BFS<D, C>
+    impl<D: SearchDomain, C> Default for BFS<D, C, NoBackOff>
     where
         D::State: Default,
         C: Cancellable,
@@ -63,29 +54,37 @@ pub mod schedule {
         }
     }
 
-    impl<D: SearchDomain, C> BFS<D, C>
-    where
-        C: Cancellable,
-    {
+    impl<D: SearchDomain, C: Cancellable> BFS<D, C, NoBackOff> {
         /// Constructs a new `BFS` scheduler with initial state `state`.
         pub fn new(state: D::State) -> Self {
             Self {
                 inner: BFScheduler::new(state),
             }
         }
+
+        /// Consturcts a new `BFS` scheduler with initial state `state` and backoff B
+        pub fn with_backoff<B: BackOff>(state: D::State) -> BFS<D, C, B> {
+            BFS {
+                inner: BFScheduler::new(state),
+            }
+        }
     }
 
-    impl<D: SearchDomain, C> StepScheduler<D::State, C> for BFS<D, C>
+    impl<D: SearchDomain, C, B> StepScheduler<D::State, C> for BFS<D, C, B>
     where
         D::Event: Clone + StaticEvent,
         D::State: Clone,
         C: Cancellable + Clone,
         <D::Policy as SelectionPolicy>::OracleEvent: Clone,
+        B: BackOff,
     {
-        type ItemMeta = <RawBFS<D, C> as StepScheduler<D::State, C>>::ItemMeta;
+        type ItemMeta = <RawBFS<D, C, B> as StepScheduler<D::State, C>>::ItemMeta;
         type StateInterpretation = <D::Policy as SelectionPolicy>::OracleEvent;
 
-        fn next(&self, token: C) -> Result<ramis_core::ScheduledStep<D::State, Self::ItemMeta>, C> {
+        fn next(
+            &self,
+            token: C,
+        ) -> Result<ramis_core::ScheduledStep<D::State, Self::ItemMeta>, StepError<C>> {
             self.inner.next(token)
         }
 
@@ -105,12 +104,78 @@ pub mod schedule {
             self.inner.is_cancelled(item)
         }
     }
-}
 
-pub mod core {
-    //! Module containing public core types and functionality of the `Ramis` crate.
-    pub mod schedule {
-        //! Module containing public core scheduler types and functionality of the `Ramis` crate. Prefer using reexports in `ramis::schedule` instead.
-        pub use ramis_schedule::BFScheduler;
+    #[cfg(feature = "bounded")]
+    pub use bounded::*;
+
+    #[cfg(feature = "bounded")]
+    mod bounded {
+        use ramis_mock::Exponential;
+        use ramis_schedule::{backend::bounded::NBLFQ, schedule::BoundedBFS as RawBoundedBFS};
+
+        use super::*;
+
+        /// A Concurrent Breadth First Search Scheduler with bounded capacity
+        pub struct BoundedBFS<D: SearchDomain, C: Cancellable, B: BackOff = Exponential> {
+            inner: RawBoundedBFS<D, C, B>,
+        }
+
+        impl<D: SearchDomain, C: Cancellable> BoundedBFS<D, C, Exponential> {
+            /// Constructs a new `BoundedBFS` scheduler with initial state `state`, bounded by `capacity`
+            pub fn new(state: D::State, capacity: usize) -> Self {
+                Self {
+                    inner: BFScheduler::new_with_queue(state, NBLFQ::new(capacity)),
+                }
+            }
+
+            /// Consturcts a new `BoundedBFS` scheduler with initial state `state` and backoff B, bounded by `capacity`
+            pub fn with_backoff<B: BackOff>(
+                state: D::State,
+                capacity: usize,
+            ) -> BoundedBFS<D, C, B> {
+                BoundedBFS {
+                    inner: BFScheduler::new_with_queue(state, NBLFQ::new(capacity)),
+                }
+            }
+        }
+
+        impl<D: SearchDomain, C, B> StepScheduler<D::State, C> for BoundedBFS<D, C, B>
+        where
+            D::Event: Clone + StaticEvent,
+            D::State: Clone,
+            C: Cancellable + Clone,
+            <D::Policy as SelectionPolicy>::OracleEvent: Clone,
+            B: BackOff,
+        {
+            type ItemMeta = <RawBFS<D, C, B> as StepScheduler<D::State, C>>::ItemMeta;
+            type StateInterpretation = <D::Policy as SelectionPolicy>::OracleEvent;
+
+            fn next(
+                &self,
+                token: C,
+            ) -> Result<ramis_core::ScheduledStep<D::State, Self::ItemMeta>, StepError<C>>
+            {
+                self.inner.next(token)
+            }
+
+            fn put_result(
+                &self,
+                path: ramis_core::ScheduledStep<D::State, Self::ItemMeta>,
+                event: Self::StateInterpretation,
+            ) {
+                self.inner.put_result(path, event);
+            }
+
+            fn notify_done(&self) {
+                self.inner.notify_done();
+            }
+
+            fn is_cancelled(
+                &self,
+                item: &ramis_core::ScheduledStep<D::State, Self::ItemMeta>,
+            ) -> bool {
+                self.inner.is_cancelled(item)
+            }
+        }
     }
 }

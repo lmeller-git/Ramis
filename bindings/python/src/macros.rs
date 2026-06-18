@@ -63,7 +63,10 @@ macro_rules! generate_bfs_bindings {
             fn next(
                 &self,
                 token: PyCancelToken,
-            ) -> Result<ScheduledStep<$state, Self::ItemMeta>, PyCancelToken> {
+            ) -> Result<
+                ScheduledStep<$state, Self::ItemMeta>,
+                ramis_schedule::StepError<PyCancelToken>,
+            > {
                 self.raw.next(token)
             }
 

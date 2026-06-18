@@ -29,3 +29,39 @@ pub trait Cancellable {
     /// is this worker cancelled?
     fn is_cancelled(&self) -> bool;
 }
+
+/// A synchronized queue used for queueing tasks in a scheduler
+pub trait SyncQueue<T> {
+    /// tries to push a value to the queue.
+    fn push(&self, item: T) -> Result<(), T>;
+    /// tries to pop a value from the queue.
+    fn pop(&self) -> Option<T>;
+    /// pushes a value to teh queue, overwriting one if necessary
+    fn force_push(&self, item: T);
+    /// Clears the queue
+    fn clear(&self);
+    /// the length of the queue
+    fn len(&self) -> usize;
+    /// the capacity of the queue
+    fn capacity(&self) -> usize;
+
+    /// is the queue empty?
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// is the queue full?
+    fn is_full(&self) -> bool {
+        self.len() == self.capacity()
+    }
+}
+
+/// Describes a backoff strategy, which may be used instead of spinning
+pub trait BackOff {
+    /// The initial state of the Backoff object
+    const INIT: Self;
+    /// backoff one step using this strategy
+    fn backoff(&mut self);
+    /// reset whatever internal state may need to be reset after soem steps
+    fn reset(&mut self);
+}

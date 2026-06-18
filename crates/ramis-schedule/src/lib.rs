@@ -11,11 +11,23 @@ extern crate std;
 extern crate alloc;
 
 mod adaptive;
+pub mod backend;
 mod breadth_first;
 mod depth_first;
 
 pub use breadth_first::*;
 use ramis_core::ScheduledStep;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+/// An error of the scheduler. This error is not necessarily terminal.
+pub enum StepError<C> {
+    /// The algorithm has terminated
+    Terminated(C),
+    /// We are busy and cannot scheduler more work currently
+    Busy(C),
+    /// Somethign unexpected happened
+    TODO(C),
+}
 
 /// The interface of a scheduler over state T and cancellation token C
 pub trait StepScheduler<T, C> {
@@ -25,11 +37,58 @@ pub trait StepScheduler<T, C> {
     type ItemMeta;
 
     /// returns the next ScheduledStep. This method only errs if the seqarch space is empty, the scheduler was killed or the algorithm failed on this state.
-    fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, C>;
+    fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, StepError<C>>;
     /// returns a ScheduledStep along with the oracles interpretation of it back to teh scheduler
     fn put_result(&self, path: ScheduledStep<T, Self::ItemMeta>, event: Self::StateInterpretation);
     /// signals to the scheduler that the algorithm is done
     fn notify_done(&self);
     /// checks wether the worker associated with a ScheduledStep has been cancelled. This is different from calling is_cancelled() on the workers CancellationToken, because the scheduler may cancel the worker in opther ways also
     fn is_cancelled(&self, item: &ScheduledStep<T, Self::ItemMeta>) -> bool;
+}
+
+pub mod schedule {
+    //! Contains types exported from ramis-schedule
+    #![allow(type_alias_bounds)]
+    use ramis_core::{Cancellable, SearchDomain, SelectionPolicy, SyncQueue};
+
+    #[cfg(feature = "bounded")]
+    use crate::backend::bounded::NBLFQ;
+    use crate::{BFScheduler, backend::LockedVecDeque, breadth_first};
+
+    type RawBFS<
+        D: SearchDomain,
+        C: Cancellable,
+        Q: SyncQueue<breadth_first::ScheduledTask<D::Event, C, D::State>>,
+        B,
+    > = BFScheduler<
+        D::State,
+        D::Event,
+        C,
+        <D::Policy as SelectionPolicy>::OracleEvent,
+        D::Policy,
+        D::Algorithm,
+        Q,
+        B,
+    >;
+
+    /// A BFS scheduler with unbounded capacity
+    pub type BFS<D: SearchDomain, C: Cancellable + Send + Sync, B> = RawBFS<
+        D,
+        C,
+        LockedVecDeque<
+            breadth_first::ScheduledTask<D::Event, C, <D::Policy as SelectionPolicy>::OracleEvent>,
+        >,
+        B,
+    >;
+
+    /// A BFS scheduler with bounded capacity
+    #[cfg(feature = "bounded")]
+    pub type BoundedBFS<D: SearchDomain, C: Cancellable, B> = RawBFS<
+        D,
+        C,
+        NBLFQ<
+            breadth_first::ScheduledTask<D::Event, C, <D::Policy as SelectionPolicy>::OracleEvent>,
+        >,
+        B,
+    >;
 }

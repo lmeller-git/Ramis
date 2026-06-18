@@ -1,10 +1,10 @@
 #![allow(clippy::type_complexity)]
 
-use alloc::collections::VecDeque;
 use core::{hash::Hash, iter::once, marker::PhantomData, ops::ControlFlow};
 
 use ramis_core::{
     Algorithm,
+    BackOff,
     BranchDirective,
     Cancellable,
     EventReplay,
@@ -13,16 +13,17 @@ use ramis_core::{
     ScheduledStep,
     SelectionPolicy,
     StaticEvent,
+    SyncQueue,
     sync::{
         Arc,
         Mutex,
         Weak,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 use smallvec::SmallVec;
 
-use crate::StepScheduler;
+use crate::{StepError, StepScheduler};
 
 /// A trace of events relative to some state at generation N
 #[derive(Hash, Clone, Default, Debug, PartialEq, Eq)]
@@ -191,56 +192,79 @@ where
     }
 }
 
+#[allow(type_alias_bounds)]
+/// A scheduled item in a BFS scheduler. This corresponds to a state-transform of the root as defined by the algorithm.
+pub type ScheduledTask<E: HasLevelStorage, C: Cancellable, S> =
+    (RelativePath<E>, Weak<TreeNode<E, C, S>>);
+
 // TODO improve locking scheme in layout and usage
+
+// TODO maybe make BFScheduler generic over Searchdomain instead. Its getting out of hand here
 
 /// A breath first search scheduler for an algorithm T, E, S, P, A.
 /// Guarantees to find a 1-minimal solution.
 /// Maximizes worker utilization by preemptively scheduling predivtive paths in a breadth first manner.
-pub struct BFScheduler<T, E, C, S, P, A>
+pub struct BFScheduler<T, E, C, S, P, A, Q, B>
 where
     C: Cancellable,
     E: HasLevelStorage,
+    Q: SyncQueue<ScheduledTask<E, C, S>>,
 {
     current_root: Mutex<T>,
     root_generation: AtomicU64,
+    pending: AtomicUsize,
 
     tasks: Mutex<Tree<E, C, S>>,
-    frontier: Mutex<VecDeque<(RelativePath<E>, Weak<TreeNode<E, C, S>>)>>,
-
-    _result: PhantomData<(S, P, A)>,
+    frontier: Q,
+    _result: PhantomData<(S, P, A, B)>,
 }
 
-impl<T, E, C, S, P, A> Default for BFScheduler<T, E, C, S, P, A>
+impl<T, E, C, S, P, A, Q, B> Default for BFScheduler<T, E, C, S, P, A, Q, B>
 where
     C: Cancellable,
     T: Default,
     E: HasLevelStorage,
+    Q: SyncQueue<ScheduledTask<E, C, S>> + Default,
 {
     fn default() -> Self {
         Self::new(T::default())
     }
 }
 
-impl<T, E, C, S, P, A> BFScheduler<T, E, C, S, P, A>
+impl<T, E, C, S, P, A, Q, B> BFScheduler<T, E, C, S, P, A, Q, B>
 where
     C: Cancellable,
     E: HasLevelStorage,
+    Q: SyncQueue<ScheduledTask<E, C, S>> + Default,
 {
     /// Constructs a new BFScheduler with the given initial State.
     pub fn new(state: T) -> Self {
+        Self::new_with_queue(state, Q::default())
+    }
+}
+
+impl<T, E, C, S, P, A, Q, B> BFScheduler<T, E, C, S, P, A, Q, B>
+where
+    C: Cancellable,
+    E: HasLevelStorage,
+    Q: SyncQueue<ScheduledTask<E, C, S>>,
+{
+    /// Constructs a new BFScheduler with the given initial State and queue.
+    pub fn new_with_queue(state: T, queue: Q) -> Self {
         Self {
             current_root: Mutex::new(state),
             root_generation: AtomicU64::new(0),
+            pending: AtomicUsize::new(0),
             tasks: Mutex::new(Tree {
                 children: Mutex::new(E::storage_from_fn(|_| None)),
             }),
-            frontier: Mutex::new(VecDeque::new()),
+            frontier: queue,
             _result: PhantomData,
         }
     }
 }
 
-impl<T, E, C, S, P, A> StepScheduler<T, C> for BFScheduler<T, E, C, S, P, A>
+impl<T, E, C, S, P, A, Q, B> StepScheduler<T, C> for BFScheduler<T, E, C, S, P, A, Q, B>
 where
     C: Cancellable + Clone,
     T: Clone,
@@ -248,20 +272,23 @@ where
     P: SelectionPolicy<OracleEvent = S>,
     A: Algorithm<T, E>,
     S: OracleEvent + Clone,
+    Q: SyncQueue<(RelativePath<E>, Weak<TreeNode<E, C, S>>)>,
+    B: BackOff,
 {
     type ItemMeta = Weak<TreeNode<E, C, S>>;
     type StateInterpretation = S;
 
-    fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, C> {
+    // TODO: add depth limit checking. Probably via ZST also.
+    fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, StepError<C>> {
         // TODO we could recheck generation in the loop and restart if it does not match anymore
+        let mut backoff = B::INIT;
         let (mut state, path_to_apply, weak) = 'get: {
-            let mut frontier = self.frontier.lock();
             let tasks = self.tasks.lock();
 
             let root_guard = self.current_root.lock();
             let current_gen = self.root_generation.load(Ordering::Acquire);
             if current_gen == u64::MAX {
-                return Err(token);
+                return Err(StepError::Terminated(token));
             }
             let root = root_guard.clone();
             drop(root_guard);
@@ -275,12 +302,19 @@ where
                 .zip(root_children.as_mut().iter_mut())
             {
                 if child.is_none() {
+                    self.pending.fetch_add(1, Ordering::Release);
+
                     let node = Arc::new(TreeNode::new(token.clone(), current_gen + 1, None));
                     let weak = Arc::downgrade(&node);
                     *child = Some(node);
 
                     let rel_path = RelativePath::new_from(current_gen, once(variant.clone()));
-                    frontier.push_back((rel_path.clone(), weak.clone()));
+
+                    while let Err((_rel_path, _weak)) =
+                        self.frontier.push((rel_path.clone(), weak.clone()))
+                    {
+                        backoff.backoff();
+                    }
 
                     break 'get (root.clone(), rel_path.path, weak);
                 }
@@ -288,10 +322,12 @@ where
 
             drop(root_children);
 
-            'outer: while let Some((mut rel_path, parent_node)) = frontier.pop_front() {
+            'outer: while let Some((mut rel_path, parent_node)) = self.frontier.pop() {
                 let Some(parent_node_strong) = parent_node.upgrade() else {
+                    self.pending.fetch_sub(1, Ordering::Release);
                     continue;
                 };
+
                 if parent_node_strong
                     .result
                     .lock()
@@ -299,57 +335,56 @@ where
                     .is_some_and(|r| matches!(P::branch_directive(r), BranchDirective::Prune))
                     || parent_node_strong.generation < current_gen + 1
                 {
+                    self.pending.fetch_sub(1, Ordering::Release);
                     continue;
                 }
 
+                // TODO: may want to reload root and gen here
+                // let current_gen = self.root_generation.load(Ordering::Acquire);
+                if rel_path.generation < current_gen {
+                    // walk parents until root to ensure we are on the correct lineage
+                    let mut curr = parent_node_strong.clone();
+                    while curr.generation > current_gen + 1 {
+                        let Some(parent) = curr.parent.as_ref().and_then(|p| p.upgrade()) else {
+                            break;
+                        };
+                        curr = parent;
+                    }
+
+                    // no parent can ever be commited, just abort this lineage
+                    if curr.generation != current_gen + 1 {
+                        self.pending.fetch_sub(1, Ordering::Release);
+                        continue 'outer;
+                    }
+
+                    let root_children = tasks.children.lock();
+                    let is_valid = root_children
+                        .as_ref()
+                        .iter()
+                        .any(|c| c.as_ref().is_some_and(|n| Arc::ptr_eq(n, &curr)));
+                    drop(root_children);
+
+                    // our root is NOT in the global root. We are on a lineage that is deattached from root
+                    if !is_valid {
+                        self.pending.fetch_sub(1, Ordering::Release);
+                        continue 'outer;
+                    }
+
+                    rel_path
+                        .path
+                        .drain(..(current_gen - rel_path.generation) as usize);
+                    rel_path.generation = current_gen;
+                }
+
                 let mut children = parent_node_strong.children.lock();
-                for (variant, child) in E::VARIANTS
+
+                let children_iter = E::VARIANTS
                     .as_ref()
                     .iter()
                     .cloned()
                     .zip(children.as_mut().iter_mut())
-                {
-                    if child.is_none() {
-                        let current_gen = self.root_generation.load(Ordering::Acquire);
-                        if rel_path.generation < current_gen {
-                            // walk parents until root to ensure we are on the correct lineage
-                            let mut curr = parent_node_strong.clone();
-                            while curr.generation > current_gen + 1 {
-                                let Some(parent) = curr.parent.as_ref().and_then(|p| p.upgrade())
-                                else {
-                                    break;
-                                };
-                                curr = parent;
-                            }
-
-                            // no parent can ever be commited, just abort this lineage
-                            if curr.generation != current_gen + 1 {
-                                continue 'outer;
-                            }
-
-                            let root_children = tasks.children.lock();
-                            let is_valid = root_children
-                                .as_ref()
-                                .iter()
-                                .any(|c| c.as_ref().is_some_and(|n| Arc::ptr_eq(n, &curr)));
-                            drop(root_children);
-
-                            // our root is NOT in the global root. We are on a lineage that is deattached from root
-                            if !is_valid {
-                                continue 'outer;
-                            }
-
-                            rel_path
-                                .path
-                                .drain(..(current_gen - rel_path.generation) as usize);
-                            rel_path.generation = current_gen;
-                        }
-
-                        let mut child_path = RelativePath::new_from(
-                            rel_path.generation,
-                            rel_path.path.iter().cloned(),
-                        );
-                        child_path.push(variant);
+                    .map(|(variant, child)| {
+                        assert!(child.is_none());
 
                         let node = Arc::new(TreeNode::new(
                             token.clone(),
@@ -359,15 +394,33 @@ where
 
                         let weak = Arc::downgrade(&node);
                         *child = Some(node);
+                        (variant, weak)
+                    });
 
-                        frontier.push_front((rel_path, parent_node));
-                        frontier.push_back((child_path.clone(), weak.clone()));
+                self.pending
+                    .fetch_add(E::VARIANTS.as_ref().iter().count(), Ordering::Release);
 
-                        break 'get (root.clone(), child_path.path, weak);
+                for (variant, item) in children_iter {
+                    backoff.reset();
+                    let mut child_path =
+                        RelativePath::new_from(rel_path.generation, rel_path.path.iter().cloned());
+                    child_path.push(variant);
+
+                    while let Err((_child_path, _item)) =
+                        self.frontier.push((child_path.clone(), item.clone()))
+                    {
+                        backoff.backoff();
                     }
                 }
+
+                break 'get (root.clone(), rel_path.path, parent_node);
             }
-            return Err(token);
+
+            if self.pending.load(Ordering::Acquire) == 0 {
+                return Err(StepError::Terminated(token));
+            } else {
+                return Err(StepError::Busy(token));
+            }
         };
 
         for ev in path_to_apply {
@@ -384,7 +437,7 @@ where
                     let mut children = strong.children.lock();
                     children.as_mut().iter_mut().for_each(|child| *child = None);
                 }
-                return Err(token);
+                return Err(StepError::TODO(token));
             }
         }
 
@@ -392,6 +445,12 @@ where
     }
 
     fn put_result(&self, path: ScheduledStep<T, Self::ItemMeta>, event: Self::StateInterpretation) {
+        _ = self
+            .pending
+            .fetch_update(Ordering::Release, Ordering::Acquire, |c| {
+                Some(c.saturating_sub(1))
+            });
+
         let advancement_data = {
             let tasks = self.tasks.lock();
 
@@ -533,8 +592,10 @@ where
     }
 
     fn notify_done(&self) {
+        let _serialize_next = self.current_root.lock();
         self.root_generation.store(u64::MAX, Ordering::Release);
-        self.frontier.lock().clear();
+        self.frontier.clear();
+        self.pending.store(0, Ordering::Release);
         self.tasks
             .lock()
             .children
