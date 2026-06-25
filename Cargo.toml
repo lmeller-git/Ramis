@@ -8,7 +8,7 @@ members = [
 ]
 
 default-members = [
-  "crates/*"
+  "crates/ramis"
 ]
 
 [workspace.package]
