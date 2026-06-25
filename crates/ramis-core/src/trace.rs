@@ -125,11 +125,11 @@ impl BranchDirective {
             (Self::Unspecified, _) => Self::Unspecified,
             (_, Self::Unspecified) => Self::Unspecified,
 
-            (Self::Prune, _) => Self::Prune,
-            (_, Self::Prune) => Self::Prune,
-
             (Self::Hold, _) => Self::Hold,
             (_, Self::Hold) => Self::Hold,
+
+            (Self::Prune, _) => Self::Prune,
+            (_, Self::Prune) => Self::Prune,
 
             (Self::Proceed, Self::Proceed) => Self::Proceed,
         }

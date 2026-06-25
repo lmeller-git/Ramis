@@ -117,8 +117,11 @@ where
         F: Fn(&S) -> BranchDirective,
     {
         let mut may_advance = BranchDirective::Proceed;
+        let mut n_pruned = 0;
 
-        for c in self.children.lock().as_ref().iter() {
+        let children = self.children.lock();
+
+        for c in children.as_ref() {
             match c {
                 None => may_advance = may_advance.and_across(&BranchDirective::Unspecified),
                 Some(c) if c.result.lock().is_none() => {
@@ -127,7 +130,12 @@ where
                 Some(c) => {
                     let r = c.result.lock();
                     if let Some(r) = r.as_ref() {
-                        may_advance = may_advance.and_across(&f(r));
+                        let directive = f(r);
+
+                        if directive == BranchDirective::Prune {
+                            n_pruned += 1;
+                        }
+                        may_advance = may_advance.and_across(&directive);
                     } else {
                         unreachable!()
                     }
@@ -135,7 +143,7 @@ where
             }
         }
 
-        may_advance.is_ready()
+        may_advance.is_ready() || n_pruned == children.as_ref().len() - 1
     }
 }
 
@@ -170,8 +178,11 @@ where
         F: Fn(&S) -> BranchDirective,
     {
         let mut may_advance = BranchDirective::Proceed;
+        let mut n_pruned = 0;
 
-        for c in self.children.lock().as_ref().iter() {
+        let children = self.children.lock();
+
+        for c in children.as_ref() {
             match c {
                 None => may_advance = may_advance.and_across(&BranchDirective::Unspecified),
                 Some(c) if c.result.lock().is_none() => {
@@ -180,7 +191,12 @@ where
                 Some(c) => {
                     let r = c.result.lock();
                     if let Some(r) = r.as_ref() {
-                        may_advance = may_advance.and_across(&f(r));
+                        let directive = f(r);
+
+                        if directive == BranchDirective::Prune {
+                            n_pruned += 1;
+                        }
+                        may_advance = may_advance.and_across(&directive);
                     } else {
                         unreachable!()
                     }
@@ -188,7 +204,7 @@ where
             }
         }
 
-        may_advance.is_ready()
+        may_advance.is_ready() || n_pruned == children.as_ref().len() - 1
     }
 }
 
