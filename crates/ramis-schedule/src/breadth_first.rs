@@ -607,12 +607,13 @@ where
     }
 
     fn notify_done(&self) {
+        let tasks_guard = self.tasks.lock();
         let _serialize_next = self.current_root.lock();
+
         self.root_generation.store(u64::MAX, Ordering::Release);
         self.frontier.clear();
         self.pending.store(0, Ordering::Release);
-        self.tasks
-            .lock()
+        tasks_guard
             .children
             .lock()
             .as_mut()
