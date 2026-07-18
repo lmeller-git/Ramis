@@ -331,8 +331,6 @@ where
                     {
                         backoff.backoff();
                     }
-
-                    break 'get (root.clone(), rel_path.path, weak);
                 }
             }
 
@@ -453,6 +451,7 @@ where
                     let mut children = strong.children.lock();
                     children.as_mut().iter_mut().for_each(|child| *child = None);
                 }
+                self.pending.fetch_sub(1, Ordering::Release);
                 return Err(StepError::TODO(token));
             }
         }

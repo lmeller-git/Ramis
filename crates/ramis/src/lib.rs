@@ -35,7 +35,8 @@ pub mod schedule {
     //! Module containing schedulers. All schedulers in this module are more convenient newtypes or reexports from `ramis::core::schedule`.
     use ramis_core::{BackOff, Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
     use ramis_mock::NoBackOff;
-    use ramis_schedule::{BFScheduler, StepError, StepScheduler, schedule::BFS as RawBFS};
+    pub use ramis_schedule::StepError;
+    use ramis_schedule::{BFScheduler, StepScheduler, schedule::BFS as RawBFS};
 
     /// A Concurrent Breadth First Search Scheduler with unbounded capacity
     pub struct BFS<D: SearchDomain, C: Cancellable, B: BackOff = NoBackOff> {
