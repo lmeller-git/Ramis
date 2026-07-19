@@ -50,13 +50,15 @@ impl Cancellable for PyCancelToken {
 
 // TODO py next should return Result<item, PyStepError> instead of Option<item>
 
-#[allow(dead_code)]
-#[pyclass(from_py_object)]
-#[derive(Clone)]
-pub struct PyStepError(StepError<PyCancelToken>);
+// TODO allow python code to return py item errors
+pub(crate) type PyError = ();
 
-impl From<StepError<PyCancelToken>> for PyStepError {
-    fn from(value: StepError<PyCancelToken>) -> Self {
+#[allow(dead_code)]
+#[pyclass]
+pub struct PyStepError(StepError<PyCancelToken, PyError>);
+
+impl From<StepError<PyCancelToken, PyError>> for PyStepError {
+    fn from(value: StepError<PyCancelToken, PyError>) -> Self {
         Self(value)
     }
 }

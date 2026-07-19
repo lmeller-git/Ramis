@@ -106,7 +106,7 @@ fn do_algo(path: &MockPath, mut base_query: Vec<u16>) -> MockInterpretationResul
 
 pub async fn run_worker<S>(scheduler: Arc<S>, base_query: Vec<u16>)
 where
-    S: StepScheduler<MockPath, MockCancelToken, StateInterpretation = MockInterpretationResult>,
+    S: StepScheduler<MockPath, MockCancelToken, (), StateInterpretation = MockInterpretationResult>,
     S::ItemMeta: Send + 'static + Clone,
 {
     loop {

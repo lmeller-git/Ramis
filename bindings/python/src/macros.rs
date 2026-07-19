@@ -9,7 +9,7 @@ macro_rules! generate_bfs_bindings {
             pub(crate)  Option<
                 ScheduledStep<
                     $state,
-                    <$bfs_name as StepScheduler<$state, PyCancelToken>>::ItemMeta,
+                    <$bfs_name as StepScheduler<$state, PyCancelToken, $crate::PyError>>::ItemMeta,
                 >,
             >,
         );
@@ -25,17 +25,19 @@ macro_rules! generate_bfs_bindings {
         impl $bfs_name {
             #[pyo3(signature = (cancel_token))]
             pub fn next(&self, cancel_token: Py<CancelToken>) -> PyResult<Option<$step_name>> {
-                Ok(<Self as StepScheduler<$state, PyCancelToken>>::next(
-                    self,
-                    PyCancelToken(cancel_token.into()),
+                Ok(
+                    <Self as StepScheduler<$state, PyCancelToken, $crate::PyError>>::next(
+                        self,
+                        PyCancelToken(cancel_token.into()),
+                    )
+                    .ok()
+                    .map(|step| $step_name(Some(step))),
                 )
-                .ok()
-                .map(|step| $step_name(Some(step))))
             }
 
             #[pyo3(signature = (step, result))]
             pub fn put_result(&self, mut step: PyRefMut<$step_name>, result: GenericResult) {
-                <Self as StepScheduler<$state, PyCancelToken>>::put_result(
+                <Self as StepScheduler<$state, PyCancelToken, $crate::PyError>>::put_result(
                     self,
                     step.0.take().unwrap(),
                     result,
@@ -43,21 +45,26 @@ macro_rules! generate_bfs_bindings {
             }
 
             pub fn notify_done(&self) {
-                <Self as StepScheduler<$state, PyCancelToken>>::notify_done(self);
+                <Self as StepScheduler<$state, PyCancelToken, $crate::PyError>>::notify_done(self);
             }
 
             #[pyo3(signature = (item))]
             pub fn is_cancelled(&self, item: PyRef<$step_name>) -> bool {
                 item.0.as_ref().is_some_and(|item| {
-                    <Self as StepScheduler<$state, PyCancelToken>>::is_cancelled(self, item)
+                    <Self as StepScheduler<$state, PyCancelToken, $crate::PyError>>::is_cancelled(
+                        self, item,
+                    )
                 })
             }
         }
 
         // StepScheduler impl
-        impl StepScheduler<$state, PyCancelToken> for $bfs_name {
-            type ItemMeta =
-                <BFS<$domain, PyCancelToken> as StepScheduler<$state, PyCancelToken>>::ItemMeta;
+        impl StepScheduler<$state, PyCancelToken, $crate::PyError> for $bfs_name {
+            type ItemMeta = <BFS<$domain, PyCancelToken> as StepScheduler<
+                $state,
+                PyCancelToken,
+                $crate::PyError,
+            >>::ItemMeta;
             type StateInterpretation = GenericResult;
 
             fn next(
@@ -65,7 +72,7 @@ macro_rules! generate_bfs_bindings {
                 token: PyCancelToken,
             ) -> Result<
                 ScheduledStep<$state, Self::ItemMeta>,
-                ramis_schedule::StepError<PyCancelToken>,
+                ramis_schedule::StepError<PyCancelToken, $crate::PyError>,
             > {
                 self.raw.next(token)
             }

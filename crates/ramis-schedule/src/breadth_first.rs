@@ -280,7 +280,7 @@ where
     }
 }
 
-impl<T, E, C, S, P, A, Q, B> StepScheduler<T, C> for BFScheduler<T, E, C, S, P, A, Q, B>
+impl<T, E, C, S, P, A, Q, B> StepScheduler<T, C, A::Error> for BFScheduler<T, E, C, S, P, A, Q, B>
 where
     C: Cancellable + Clone,
     T: Clone,
@@ -295,7 +295,7 @@ where
     type StateInterpretation = S;
 
     // TODO: add depth limit checking. Probably via ZST also.
-    fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, StepError<C>> {
+    fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, StepError<C, A::Error>> {
         // TODO we could recheck generation in the loop and restart if it does not match anymore
         let mut backoff = B::INIT;
         let (mut state, path_to_apply, weak) = 'get: {
@@ -438,7 +438,7 @@ where
         };
 
         for ev in path_to_apply {
-            if let Err(_e) = A::step(&mut state, ev) {
+            if let Err(e) = A::step(&mut state, ev) {
                 // since we put the node into the tree already, we should try to mark it as dead
                 // we can also immediately reap all of its children, as we did just put this node back into the queue
                 // This does NOT ensure that no other thread runs a child/puts one back into the queue.
@@ -452,7 +452,7 @@ where
                     children.as_mut().iter_mut().for_each(|child| *child = None);
                 }
                 self.pending.fetch_sub(1, Ordering::Release);
-                return Err(StepError::TODO(token));
+                return Err(StepError::Algorithmic((token, e)));
             }
         }
 

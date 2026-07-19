@@ -34,7 +34,7 @@ pub mod components {
 pub mod schedule {
     //! Module containing schedulers. All schedulers in this module are more convenient newtypes or reexports from `ramis::core::schedule`.
     pub use ramis_core::BranchDirective;
-    use ramis_core::{BackOff, Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
+    use ramis_core::{Algorithm, BackOff, Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
     use ramis_mock::NoBackOff;
     pub use ramis_schedule::StepError;
     use ramis_schedule::{BFScheduler, StepScheduler, schedule::BFS as RawBFS};
@@ -72,7 +72,9 @@ pub mod schedule {
         }
     }
 
-    impl<D: SearchDomain, C, B> StepScheduler<D::State, C> for BFS<D, C, B>
+    impl<D: SearchDomain, C, B>
+        StepScheduler<D::State, C, <D::Algorithm as Algorithm<D::State, D::Event>>::Error>
+        for BFS<D, C, B>
     where
         D::Event: Clone + StaticEvent,
         D::State: Clone,
@@ -80,13 +82,20 @@ pub mod schedule {
         <D::Policy as SelectionPolicy>::OracleEvent: Clone,
         B: BackOff,
     {
-        type ItemMeta = <RawBFS<D, C, B> as StepScheduler<D::State, C>>::ItemMeta;
+        type ItemMeta = <RawBFS<D, C, B> as StepScheduler<
+            D::State,
+            C,
+            <D::Algorithm as Algorithm<D::State, D::Event>>::Error,
+        >>::ItemMeta;
         type StateInterpretation = <D::Policy as SelectionPolicy>::OracleEvent;
 
         fn next(
             &self,
             token: C,
-        ) -> Result<ramis_core::ScheduledStep<D::State, Self::ItemMeta>, StepError<C>> {
+        ) -> Result<
+            ramis_core::ScheduledStep<D::State, Self::ItemMeta>,
+            StepError<C, <D::Algorithm as Algorithm<D::State, D::Event>>::Error>,
+        > {
             self.inner.next(token)
         }
 
@@ -112,6 +121,7 @@ pub mod schedule {
 
     #[cfg(feature = "bounded")]
     mod bounded {
+        use ramis_core::Algorithm;
         use ramis_mock::Exponential;
         use ramis_schedule::{backend::bounded::NBLFQ, schedule::BoundedBFS as RawBoundedBFS};
 
@@ -141,7 +151,9 @@ pub mod schedule {
             }
         }
 
-        impl<D: SearchDomain, C, B> StepScheduler<D::State, C> for BoundedBFS<D, C, B>
+        impl<D: SearchDomain, C, B>
+            StepScheduler<D::State, C, <D::Algorithm as Algorithm<D::State, D::Event>>::Error>
+            for BoundedBFS<D, C, B>
         where
             D::Event: Clone + StaticEvent,
             D::State: Clone,
@@ -149,14 +161,20 @@ pub mod schedule {
             <D::Policy as SelectionPolicy>::OracleEvent: Clone,
             B: BackOff,
         {
-            type ItemMeta = <RawBFS<D, C, B> as StepScheduler<D::State, C>>::ItemMeta;
+            type ItemMeta = <RawBFS<D, C, B> as StepScheduler<
+                D::State,
+                C,
+                <D::Algorithm as Algorithm<D::State, D::Event>>::Error,
+            >>::ItemMeta;
             type StateInterpretation = <D::Policy as SelectionPolicy>::OracleEvent;
 
             fn next(
                 &self,
                 token: C,
-            ) -> Result<ramis_core::ScheduledStep<D::State, Self::ItemMeta>, StepError<C>>
-            {
+            ) -> Result<
+                ramis_core::ScheduledStep<D::State, Self::ItemMeta>,
+                StepError<C, <D::Algorithm as Algorithm<D::State, D::Event>>::Error>,
+            > {
                 self.inner.next(token)
             }
 

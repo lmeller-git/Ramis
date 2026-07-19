@@ -21,6 +21,7 @@ where
         + StepScheduler<
             VecTrace<E>,
             AtomicCancellationToken,
+            (),
             StateInterpretation = GenericOracleEvent,
         >,
 {
@@ -50,6 +51,7 @@ where
         + StepScheduler<
             VecTrace<E>,
             AtomicCancellationToken,
+            (),
             StateInterpretation = GenericOracleEvent,
         >,
 {
@@ -81,6 +83,7 @@ where
         + StepScheduler<
             VecTrace<E>,
             AtomicCancellationToken,
+            (),
             StateInterpretation = GenericOracleEvent,
         >,
 {
@@ -107,6 +110,7 @@ where
         + StepScheduler<
             VecTrace<E>,
             AtomicCancellationToken,
+            (),
             StateInterpretation = GenericOracleEvent,
         >,
 {
@@ -133,6 +137,7 @@ where
         + StepScheduler<
             VecTrace<E>,
             AtomicCancellationToken,
+            (),
             StateInterpretation = GenericOracleEvent,
         > + Sync,
 {
@@ -184,6 +189,7 @@ where
         + StepScheduler<
             VecTrace<E>,
             AtomicCancellationToken,
+            (),
             StateInterpretation = GenericOracleEvent,
         > + Sync,
 {

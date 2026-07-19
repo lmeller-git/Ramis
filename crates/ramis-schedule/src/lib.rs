@@ -18,26 +18,28 @@ mod depth_first;
 pub use breadth_first::*;
 use ramis_core::ScheduledStep;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug)]
 /// An error of the scheduler. This error is not necessarily terminal.
-pub enum StepError<C> {
+pub enum StepError<C, E> {
     /// The algorithm has terminated
     Terminated(C),
     /// We are busy and cannot scheduler more work currently
     Busy(C),
+    /// The algorithm ran into an error
+    Algorithmic((C, E)),
     /// Somethign unexpected happened
     TODO(C),
 }
 
 /// The interface of a scheduler over state T and cancellation token C
-pub trait StepScheduler<T, C> {
+pub trait StepScheduler<T, C, E> {
     /// The type of Oracle events respected by thsi scheduler
     type StateInterpretation;
     /// the type of metadata used to identify ScheduledSteps
     type ItemMeta;
 
     /// returns the next ScheduledStep. This method only errs if the seqarch space is empty, the scheduler was killed or the algorithm failed on this state.
-    fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, StepError<C>>;
+    fn next(&self, token: C) -> Result<ScheduledStep<T, Self::ItemMeta>, StepError<C, E>>;
     /// returns a ScheduledStep along with the oracles interpretation of it back to teh scheduler
     fn put_result(&self, path: ScheduledStep<T, Self::ItemMeta>, event: Self::StateInterpretation);
     /// signals to the scheduler that the algorithm is done
