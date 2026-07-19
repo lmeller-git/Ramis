@@ -365,13 +365,13 @@ fn par_bfs() {
                     Err(_) => continue,
                 };
 
-                if next_state.path().grid.is_finished(&target) {
-                    println!("{}", next_state.path().grid);
+                if next_state.state().grid.is_finished(&target) {
+                    println!("{}", next_state.state().grid);
                     scheduler.notify_done();
                     break;
                 }
 
-                if !seen.insert(next_state.path().grid.map) {
+                if !seen.insert(next_state.state().grid.map) {
                     scheduler.put_result(next_state, GenericOracleEvent::Dead);
                 } else {
                     scheduler.put_result(next_state, GenericOracleEvent::Alive(0));
@@ -406,13 +406,13 @@ async fn run_worker(
             Err(_) => continue,
         };
 
-        if !seen.insert(path.path().grid.map) {
+        if !seen.insert(path.state().grid.map) {
             scheduler.put_result(path, GenericOracleEvent::Dead);
             continue;
         }
 
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let current_grid = path.path().grid.clone();
+        let current_grid = path.state().grid.clone();
         let target_clone = target_grid.clone();
 
         tokio::task::spawn_blocking(move || {
@@ -424,7 +424,7 @@ async fn run_worker(
             _ = token.token().cancelled() => {}
             Ok(is_goal_state) = rx => {
                 if is_goal_state {
-                    println!("{}", path.path().grid);
+                    println!("{}", path.state().grid);
                     scheduler.notify_done();
                     return;
                 } else {

@@ -118,7 +118,7 @@ where
         };
 
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let path_ = path.path().clone();
+        let path_ = path.state().clone();
 
         tokio::spawn(async move {
             let res = tokio::task::spawn_blocking(move || do_algo(&path_, query)).await;

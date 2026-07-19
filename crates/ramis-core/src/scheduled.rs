@@ -17,7 +17,7 @@ impl<T, M> ScheduledStep<T, M> {
     }
 
     /// reutrns the state of this step
-    pub fn path(&self) -> &T {
+    pub fn state(&self) -> &T {
         &self.recording
     }
 }

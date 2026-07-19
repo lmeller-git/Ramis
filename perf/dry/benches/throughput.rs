@@ -25,7 +25,7 @@ fn bench_scheduler_throughput(c: &mut Criterion) {
                 for _ in 0..operations_per_iter {
                     let token = MockCancelToken::new();
                     if let Ok(path) = scheduler.next(token.clone()) {
-                        let is_valid = mock_oracle(path.path());
+                        let is_valid = mock_oracle(path.state());
                         let event_interp = MockInterpretation(is_valid);
                         scheduler.put_result(path, event_interp);
                     } else {
@@ -54,7 +54,7 @@ fn bench_scheduler_throughput(c: &mut Criterion) {
                                         continue;
                                     }
 
-                                    let is_valid = mock_oracle(path.path());
+                                    let is_valid = mock_oracle(path.state());
                                     let event_interp = MockInterpretation(is_valid);
 
                                     sched.put_result(path, event_interp);

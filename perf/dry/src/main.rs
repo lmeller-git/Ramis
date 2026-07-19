@@ -51,7 +51,7 @@ fn run_stress_test(num_workers: usize, total_queries: usize) {
                         if token.is_cancelled() {
                             continue;
                         }
-                        let is_valid = mock_oracle(path.path());
+                        let is_valid = mock_oracle(path.state());
                         sch.put_result(path, MockInterpretation(is_valid));
                     } else {
                         break;

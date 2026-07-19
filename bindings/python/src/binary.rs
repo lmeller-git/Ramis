@@ -37,7 +37,7 @@ generate_bfs_bindings!(BinaryBFS, BinaryBFSStep, BinaryTreeSearch, PyStateWrappe
 #[pymethods]
 impl BinaryBFSStep {
     pub fn state(&self) -> &Py<PyState> {
-        &self.0.as_ref().map(|step| step.path()).unwrap().0
+        &self.0.as_ref().map(|step| step.state()).unwrap().0
     }
 }
 

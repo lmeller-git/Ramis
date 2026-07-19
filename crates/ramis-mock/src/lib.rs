@@ -59,10 +59,10 @@ impl BackOff for Exponential {
 
     fn backoff(&mut self) {
         #[cfg(feature = "std")]
-        std::thread::sleep(Duration::from_micros(self.0));
+        ramis_core::sync::thread::sleep(Duration::from_micros(self.0));
         #[cfg(not(feature = "std"))]
         for _ in 0..self.0 {
-            core::hint::spin_loop();
+            ramis_core::sync::hint::spin_loop();
         }
 
         self.0 = (self.0 * 2).min(1024);
@@ -71,4 +71,19 @@ impl BackOff for Exponential {
     fn reset(&mut self) {
         self.0 = 1
     }
+}
+
+#[cfg(feature = "std")]
+/// A Backoff that yields the thread
+pub struct Yield;
+
+#[cfg(feature = "std")]
+impl BackOff for Yield {
+    const INIT: Self = Self;
+
+    fn backoff(&mut self) {
+        ramis_core::sync::thread::yield_now();
+    }
+
+    fn reset(&mut self) {}
 }

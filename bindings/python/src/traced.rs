@@ -86,7 +86,7 @@ generate_bfs_bindings!(TracedBFS, TracedStep, TracedAlgoDomain, Trace);
 #[pymethods]
 impl TracedStep {
     pub fn path(&self) -> Trace {
-        self.0.as_ref().map(|step| step.path().clone()).unwrap()
+        self.0.as_ref().map(|step| step.state().clone()).unwrap()
     }
 }
 
