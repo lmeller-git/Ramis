@@ -33,6 +33,7 @@ pub mod components {
 
 pub mod schedule {
     //! Module containing schedulers. All schedulers in this module are more convenient newtypes or reexports from `ramis::core::schedule`.
+    pub use ramis_core::BranchDirective;
     use ramis_core::{BackOff, Cancellable, SearchDomain, SelectionPolicy, StaticEvent};
     use ramis_mock::NoBackOff;
     pub use ramis_schedule::StepError;
