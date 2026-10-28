@@ -13,10 +13,10 @@ default-members = [
 
 [workspace.package]
 version = "0.1.0"
-authors = []
+authors = ["Louis Meller <louis.meller@icloud.com>"]
 edition = "2024"
-license = ""
-repository = ""
+license = "MIT"
+repository = "https://github.com/lmeller-git/Ramis"
 
 [workspace.dependencies]
 ramis-core = { path = "./crates/ramis-core" }
